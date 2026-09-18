@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-eframe = "0.36.2"
+iced = "0.14"
+iced_aw = "0.14"
 fatfs = "0.3"
 rfd = "0.17.2"
