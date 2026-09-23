@@ -1,17 +1,20 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+pub mod error;
 pub mod image;
 mod modal;
 
+use crate::error::Error;
 use crate::image::ImageFile;
-use crate::modal::{ErrorModal, ExitModal, Modal};
+use crate::modal::create::CreateModal;
+use crate::modal::error::ErrorModal;
+use crate::modal::exit::ExitModal;
+use crate::modal::{Modal, ModalMessage};
 use fatfs::FileSystem;
 use fscommon::BufStream;
 use iced::widget::{Button, Column, button, container, stack, text};
 use iced::{Alignment, Background, Color, Element, Length, Size, Task, Theme, window};
 use iced_aw::{menu, menu_bar};
-use std::cmp::PartialEq;
-use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -31,85 +34,77 @@ struct Application {
 }
 
 #[derive(Debug, Clone)]
-enum Message {
+pub enum ApplicationMessage {
     SelectImageFile,
     OpenImageFile(PathBuf),
     CreateImageFile(ImageFile),
     Exit,
     OpenModal(Modal),
     CloseModal,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-enum Error {
-    ImageFileCreateFailed(PathBuf),
-    ImageFileOpenFailed(PathBuf),
-}
-
-impl std::error::Error for Error {}
-
-impl Display for Error {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::ImageFileCreateFailed(path) => {
-                write!(formatter, "Failed to create image file: {}", path.display())
-            }
-            Error::ImageFileOpenFailed(path) => {
-                write!(formatter, "Failed to open image file: {}", path.display())
-            }
-        }
-    }
+    ModalAction(ModalMessage),
 }
 
 impl Application {
-    fn update(&mut self, message: Message) -> Task<Message> {
+    fn update(&mut self, message: ApplicationMessage) -> Task<ApplicationMessage> {
         match message {
-            Message::SelectImageFile => {
+            ApplicationMessage::SelectImageFile => {
                 let picked_image_file_path = rfd::FileDialog::new()
                     .add_filter("Image file", &["img"])
                     .pick_file();
 
                 if let Some(image_file_path) = picked_image_file_path {
-                    return Task::done(Message::OpenImageFile(image_file_path));
+                    return Task::done(ApplicationMessage::OpenImageFile(image_file_path));
                 };
             }
-            Message::OpenImageFile(path) => {
+            ApplicationMessage::OpenImageFile(path) => {
                 let file_system = image::open(&path);
 
-                if let Ok(file_system) = file_system {
-                    self.file_system = Some(file_system);
-                } else {
-                    self.show_error(Error::ImageFileOpenFailed(path));
+                match file_system {
+                    Ok(file_system) => self.file_system = Some(file_system),
+                    Err(error) => {
+                        self.show_error(Error::ImageFileOpenFailed(path, error.to_string()))
+                    }
                 }
             }
-            Message::CreateImageFile(image_file) => {
+            ApplicationMessage::CreateImageFile(image_file) => {
                 let file_system = image::create(&image_file);
 
-                if let Ok(image_file) = file_system {
-                    self.file_system = Some(image_file);
-                } else {
-                    self.show_error(Error::ImageFileCreateFailed(image_file.path))
+                match file_system {
+                    Ok(file_system) => self.file_system = Some(file_system),
+                    Err(error) => {
+                        self.show_error(Error::ImageFileCreateFailed(image_file.path, error.to_string()))
+                    }
                 }
             }
-            Message::OpenModal(modal) => self.active_modal = Some(modal),
-            Message::Exit => return window::latest().and_then(window::close),
-            Message::CloseModal => self.active_modal = None,
+            ApplicationMessage::OpenModal(modal) => self.active_modal = Some(modal),
+            ApplicationMessage::Exit => return window::latest().and_then(window::close),
+            ApplicationMessage::CloseModal => self.active_modal = None,
+            ApplicationMessage::ModalAction(modal_message) => {
+                if let Some(modal) = &mut self.active_modal {
+                    return modal.update(modal_message);
+                }
+            }
         }
 
         Task::none()
     }
 
-    fn view(&self) -> Element<'_, Message> {
+    fn view(&self) -> Element<'_, ApplicationMessage> {
         let file_menu = menu!(
             (Button::new(text("Открыть образ").size(14))
-                .on_press(Message::SelectImageFile)
+                .on_press(ApplicationMessage::SelectImageFile)
                 .style(button::text)
                 .width(Length::Fill)),
             (Button::new(text("Создать образ").size(14))
+                .on_press(ApplicationMessage::OpenModal(Modal::Create(
+                    CreateModal::default()
+                )))
                 .style(button::text)
                 .width(Length::Fill)),
             (Button::new(text("Выход").size(14))
-                .on_press(Message::OpenModal(Modal::Exit(ExitModal::default())))
+                .on_press(ApplicationMessage::OpenModal(Modal::Exit(
+                    ExitModal::default()
+                )))
                 .style(button::text)
                 .width(Length::Fill))
         )
@@ -119,7 +114,7 @@ impl Application {
 
         let content = Column::new().padding(8).spacing(10).push(menu_bar);
 
-        let layout: Element<'_, Message> = container(content)
+        let layout: Element<'_, ApplicationMessage> = container(content)
             .width(Length::Fill)
             .height(Length::Fill)
             .into();
@@ -134,7 +129,7 @@ impl Application {
                     .align_x(Alignment::Center)
                     .align_y(Alignment::Center),
             )
-            .on_press(Message::CloseModal)
+            .on_press(ApplicationMessage::CloseModal)
             .style(button::text)
             .width(Length::Fill)
             .height(Length::Fill);

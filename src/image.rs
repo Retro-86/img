@@ -10,16 +10,14 @@ pub struct ImageFile {
     pub path: PathBuf,
     pub volume_label: [u8; 11],
     pub size: u64,
-    pub cluster_size: u32,
 }
 
 impl ImageFile {
-    pub fn new(path: PathBuf, volume_label: [u8; 11], size: u64, cluster_size: u32) -> Self {
+    pub fn new(path: PathBuf, volume_label: [u8; 11], size: u64) -> Self {
         Self {
             path,
             volume_label,
             size,
-            cluster_size,
         }
     }
 }
@@ -43,8 +41,7 @@ pub fn create(image_file: &ImageFile) -> Result<FileSystem<BufStream<File>>, Err
 
     let format_options = fatfs::FormatVolumeOptions::new()
         .fat_type(FatType::Fat16)
-        .volume_label(image_file.volume_label)
-        .bytes_per_cluster(image_file.cluster_size);
+        .volume_label(image_file.volume_label);
 
     fatfs::format_volume(&mut buffered_stream, format_options)?;
 
