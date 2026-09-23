@@ -6,7 +6,7 @@ use std::ops::RangeInclusive;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug)]
-pub enum CreateModalMessage {
+pub enum Message {
     ImageFileNameChanged(String),
     ImageFilePathChanged(String),
     ImageFileSelectPath,
@@ -15,14 +15,19 @@ pub enum CreateModalMessage {
     ImageFileCreate,
 }
 
+pub enum Event {
+    Message(Message),
+    Submitted(ImageFile),
+}
+
 #[derive(Clone, Debug)]
-pub struct CreateModal {
+pub struct Modal {
     file_name: String,
     file_path: String,
     image_size: u32,
 }
 
-impl Default for CreateModal {
+impl Default for Modal {
     fn default() -> Self {
         Self {
             file_name: "image".to_string(),
@@ -32,8 +37,8 @@ impl Default for CreateModal {
     }
 }
 
-impl ModalWindow for CreateModal {
-    type Message = CreateModalMessage;
+impl ModalWindow for Modal {
+    type Message = Message;
 
     fn view(&self) -> Element<'_, Self::Message> {
         container(
@@ -42,7 +47,7 @@ impl ModalWindow for CreateModal {
                 .align_x(Alignment::Center)
                 .push(
                     text_input("Image file name", &self.file_name)
-                        .on_input(CreateModalMessage::ImageFileNameChanged),
+                        .on_input(Message::ImageFileNameChanged),
                 )
                 .push(
                     Row::new()
@@ -50,19 +55,19 @@ impl ModalWindow for CreateModal {
                         .align_y(Alignment::Center)
                         .push(
                             text_input("Image file path", &self.file_path)
-                                .on_input(CreateModalMessage::ImageFilePathChanged),
+                                .on_input(Message::ImageFilePathChanged),
                         )
-                        .push(button("Select").on_press(CreateModalMessage::ImageFileSelectPath)),
+                        .push(button("Select").on_press(Message::ImageFileSelectPath)),
                 )
                 .push(slider(
                     RangeInclusive::new(1, 2048),
                     self.image_size,
-                    CreateModalMessage::ImageFileSizeChanged,
+                    Message::ImageFileSizeChanged,
                 ))
                 .push(
                     button("Create image")
                         .style(button::primary)
-                        .on_press(CreateModalMessage::ImageFileCreate),
+                        .on_press(Message::ImageFileCreate),
                 ),
         )
         .width(300)
@@ -72,20 +77,20 @@ impl ModalWindow for CreateModal {
     }
 }
 
-impl CreateModal {
-    pub fn update(&mut self, message: CreateModalMessage) -> Task<CreateModalMessage> {
+impl Modal {
+    pub fn update(&mut self, message: Message) -> Task<Event> {
         match message {
-            CreateModalMessage::ImageFileNameChanged(value) => self.file_name = value,
-            CreateModalMessage::ImageFilePathChanged(value) => self.file_path = value,
-            CreateModalMessage::ImageFileSizeChanged(value) => self.image_size = value,
-            CreateModalMessage::ImageFileCreate => return Task::none(),
-            CreateModalMessage::ImageFileSelectPath => {
+            Message::ImageFileNameChanged(value) => self.file_name = value,
+            Message::ImageFilePathChanged(value) => self.file_path = value,
+            Message::ImageFileSizeChanged(value) => self.image_size = value,
+            Message::ImageFileCreate => return Task::done(Event::Submitted(self.image_file())),
+            Message::ImageFileSelectPath => {
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                    return Task::done(CreateModalMessage::ImageFilePathSelected(path));
+                    return Task::done(Event::Message(Message::ImageFilePathSelected(path)));
                 }
             }
 
-            CreateModalMessage::ImageFilePathSelected(path) => {
+            Message::ImageFilePathSelected(path) => {
                 self.file_path = path.to_string_lossy().into_owned();
             }
         }
@@ -93,12 +98,11 @@ impl CreateModal {
         Task::none()
     }
 
-    pub fn create_image_file(&self) -> ImageFile {
+    fn image_file(&self) -> ImageFile {
         let image_size = self.image_size as u64 * 1_048_576;
 
         ImageFile::new(
-            PathBuf::from(&self.file_path)
-                .join(format!("{}.img", self.file_name)),
+            PathBuf::from(&self.file_path).join(format!("{}.img", self.file_name)),
             *b"EMULATED_FS",
             image_size,
         )

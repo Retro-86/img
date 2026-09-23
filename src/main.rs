@@ -6,10 +6,7 @@ mod modal;
 
 use crate::error::Error;
 use crate::image::ImageFile;
-use crate::modal::create::CreateModal;
-use crate::modal::error::ErrorModal;
-use crate::modal::exit::ExitModal;
-use crate::modal::{Modal, ModalMessage};
+use crate::modal::{create, exit, Modal, ModalMessage};
 use fatfs::FileSystem;
 use fscommon::BufStream;
 use iced::widget::{Button, Column, button, container, stack, text};
@@ -71,18 +68,20 @@ impl Application {
 
                 match file_system {
                     Ok(file_system) => self.file_system = Some(file_system),
-                    Err(error) => {
-                        self.show_error(Error::ImageFileCreateFailed(image_file.path, error.to_string()))
-                    }
+                    Err(error) => self.show_error(Error::ImageFileCreateFailed(
+                        image_file.path,
+                        error.to_string(),
+                    )),
                 }
             }
             ApplicationMessage::OpenModal(modal) => self.active_modal = Some(modal),
             ApplicationMessage::Exit => return window::latest().and_then(window::close),
             ApplicationMessage::CloseModal => self.active_modal = None,
-            ApplicationMessage::ModalAction(modal_message) => {
-                if let Some(modal) = &mut self.active_modal {
-                    return modal.update(modal_message);
-                }
+            ApplicationMessage::ModalAction(message) => {
+                return match &mut self.active_modal {
+                    Some(modal) => modal.update(message),
+                    None => Task::none(),
+                };
             }
         }
 
@@ -97,13 +96,13 @@ impl Application {
                 .width(Length::Fill)),
             (Button::new(text("Создать образ").size(14))
                 .on_press(ApplicationMessage::OpenModal(Modal::Create(
-                    CreateModal::default()
+                    create::Modal::default()
                 )))
                 .style(button::text)
                 .width(Length::Fill)),
             (Button::new(text("Выход").size(14))
                 .on_press(ApplicationMessage::OpenModal(Modal::Exit(
-                    ExitModal::default()
+                    exit::Modal::default()
                 )))
                 .style(button::text)
                 .width(Length::Fill))
@@ -151,7 +150,7 @@ impl Application {
     }
 
     fn show_error(&mut self, error: Error) {
-        self.active_modal = Some(Modal::Error(ErrorModal::new(error)));
+        self.active_modal = Some(Modal::Error(modal::error::Modal::new(error)));
     }
 
     fn theme(&self) -> Theme {

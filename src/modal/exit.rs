@@ -4,9 +4,9 @@ use iced::widget::{Button, Column, button, container, row, text};
 use iced::{Alignment, Element, Length};
 
 #[derive(Default, Clone, Debug, PartialEq)]
-pub struct ExitModal;
+pub struct Modal;
 
-impl ModalWindow for ExitModal {
+impl ModalWindow for Modal {
     type Message = ApplicationMessage;
 
     fn view(&self) -> Element<'_, Self::Message> {

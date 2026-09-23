@@ -3,9 +3,6 @@ pub mod error;
 pub mod exit;
 
 use crate::ApplicationMessage;
-use crate::modal::create::{CreateModal, CreateModalMessage};
-use crate::modal::error::ErrorModal;
-use crate::modal::exit::ExitModal;
 use iced::{Element, Task};
 
 pub trait ModalWindow {
@@ -16,16 +13,16 @@ pub trait ModalWindow {
 
 #[derive(Debug, Clone)]
 pub enum ModalMessage {
-    Create(CreateModalMessage),
+    Create(create::Message),
     Exit,
     Error,
 }
 
 #[derive(Debug, Clone)]
 pub enum Modal {
-    Exit(ExitModal),
-    Error(ErrorModal),
-    Create(CreateModal),
+    Exit(exit::Modal),
+    Error(error::Modal),
+    Create(create::Modal),
 }
 
 impl Modal {
@@ -41,28 +38,21 @@ impl Modal {
     }
 
     pub fn update(&mut self, message: ModalMessage) -> Task<ApplicationMessage> {
-        match message {
-            ModalMessage::Create(CreateModalMessage::ImageFileCreate) => {
-                if let Modal::Create(window) = self {
-                    return Task::done(ApplicationMessage::CreateImageFile(
-                        window.create_image_file(),
-                    ));
-                }
-
-                Task::none()
-            }
-
-            ModalMessage::Create(message) => {
-                if let Modal::Create(window) = self {
-                    return window.update(message).map(|message| {
-                        ApplicationMessage::ModalAction(ModalMessage::Create(message))
-                    });
-                }
-
-                Task::none()
+        match (self, message) {
+            (Self::Create(modal), ModalMessage::Create(message)) => {
+                modal.update(message).map(map_create_event)
             }
 
             _ => Task::none(),
         }
+    }
+}
+
+fn map_create_event(event: create::Event) -> ApplicationMessage {
+    match event {
+        create::Event::Message(message) => {
+            ApplicationMessage::ModalAction(ModalMessage::Create(message))
+        }
+        create::Event::Submitted(image) => ApplicationMessage::CreateImageFile(image),
     }
 }

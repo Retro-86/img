@@ -5,17 +5,17 @@ use iced::widget::{Column, button, container, text};
 use iced::{Alignment, Element, Length};
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct ErrorModal {
+pub struct Modal {
     error: Error,
 }
 
-impl ErrorModal {
+impl Modal {
     pub fn new(error: Error) -> Self {
-        ErrorModal { error }
+        Modal { error }
     }
 }
 
-impl ModalWindow for ErrorModal {
+impl ModalWindow for Modal {
     type Message = ApplicationMessage;
 
     fn view(&self) -> Element<'_, Self::Message> {
