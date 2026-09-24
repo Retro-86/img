@@ -1,6 +1,6 @@
 use crate::image::ImageFile;
 use crate::modal::ModalWindow;
-use iced::widget::{Column, Row, button, container, slider, text_input};
+use iced::widget::{Column, Row, button, container, slider, text, text_input};
 use iced::{Alignment, Element, Task};
 use std::ops::RangeInclusive;
 use std::path::PathBuf;
@@ -46,24 +46,43 @@ impl ModalWindow for Modal {
                 .spacing(20)
                 .align_x(Alignment::Center)
                 .push(
-                    text_input("Image file name", &self.file_name)
-                        .on_input(Message::ImageFileNameChanged),
+                    Column::new()
+                        .push(text("Image file name"))
+                        .push(
+                            text_input("image", &self.file_name)
+                                .on_input(Message::ImageFileNameChanged),
+                        )
+                        .spacing(2),
                 )
                 .push(
-                    Row::new()
-                        .spacing(20)
-                        .align_y(Alignment::Center)
+                    Column::new()
+                        .push(text("Image file path"))
                         .push(
-                            text_input("Image file path", &self.file_path)
-                                .on_input(Message::ImageFilePathChanged),
+                            Row::new()
+                                .spacing(10)
+                                .align_y(Alignment::Center)
+                                .push(
+                                    text_input("path", &self.file_path)
+                                        .on_input(Message::ImageFilePathChanged),
+                                )
+                                .push(button("Select").on_press(Message::ImageFileSelectPath)),
                         )
-                        .push(button("Select").on_press(Message::ImageFileSelectPath)),
+                        .spacing(2),
                 )
-                .push(slider(
-                    RangeInclusive::new(1, 2048),
-                    self.image_size,
-                    Message::ImageFileSizeChanged,
-                ))
+                .push(
+                    Column::new()
+                        .push(text(format!("Image size - {}MiB", self.image_size)))
+                        .push(
+                            slider(
+                                RangeInclusive::new(1, 2048),
+                                self.image_size,
+                                Message::ImageFileSizeChanged,
+                            )
+                            .step(1u32)
+                            .width(400),
+                        )
+                        .spacing(2),
+                )
                 .push(
                     button("Create image")
                         .style(button::primary)

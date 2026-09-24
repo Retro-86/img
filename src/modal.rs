@@ -3,7 +3,8 @@ pub mod error;
 pub mod exit;
 
 use crate::ApplicationMessage;
-use iced::{Element, Task};
+use iced::widget::container;
+use iced::{Alignment, Background, Color, Element, Length, Task};
 
 pub trait ModalWindow {
     type Message;
@@ -55,4 +56,19 @@ fn map_create_event(event: create::Event) -> ApplicationMessage {
         }
         create::Event::Submitted(image) => ApplicationMessage::CreateImageFile(image),
     }
+}
+
+pub fn open(modal: &Modal) -> Element<'_, ApplicationMessage> {
+    let modal_content = modal.view();
+
+    container(modal_content)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(|_| container::Style {
+            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
+            ..Default::default()
+        })
+        .align_x(Alignment::Center)
+        .align_y(Alignment::Center)
+        .into()
 }

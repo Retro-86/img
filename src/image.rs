@@ -34,7 +34,13 @@ pub fn open(image_file_path: &Path) -> Result<FileSystem<BufStream<File>>, Error
 }
 
 pub fn create(image_file: &ImageFile) -> Result<FileSystem<BufStream<File>>, Error> {
-    let file = File::create(image_file.path.clone())?;
+    let file = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(image_file.path.clone())?;
+
     file.set_len(image_file.size)?;
 
     let mut buffered_stream = BufStream::new(file);

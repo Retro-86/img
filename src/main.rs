@@ -6,11 +6,11 @@ mod modal;
 
 use crate::error::Error;
 use crate::image::ImageFile;
-use crate::modal::{create, exit, Modal, ModalMessage};
+use crate::modal::{Modal, ModalMessage, create, exit};
 use fatfs::FileSystem;
 use fscommon::BufStream;
 use iced::widget::{Button, Column, button, container, stack, text};
-use iced::{Alignment, Background, Color, Element, Length, Size, Task, Theme, window};
+use iced::{Element, Length, Size, Task, Theme, window};
 use iced_aw::{menu, menu_bar};
 use std::fs::File;
 use std::path::PathBuf;
@@ -67,7 +67,10 @@ impl Application {
                 let file_system = image::create(&image_file);
 
                 match file_system {
-                    Ok(file_system) => self.file_system = Some(file_system),
+                    Ok(file_system) => {
+                        self.file_system = Some(file_system);
+                        return Task::done(ApplicationMessage::CloseModal);
+                    }
                     Err(error) => self.show_error(Error::ImageFileCreateFailed(
                         image_file.path,
                         error.to_string(),
@@ -111,7 +114,18 @@ impl Application {
 
         let menu_bar = menu_bar!((text("Файл").size(14), file_menu),);
 
-        let content = Column::new().padding(8).spacing(10).push(menu_bar);
+        let body = container(text(format!(
+            "FileSystem={:?}",
+            self.file_system
+                .as_ref()
+                .map(|system| system.volume_label())
+        )));
+
+        let content = Column::new()
+            .padding(8)
+            .spacing(10)
+            .push(menu_bar)
+            .push(body);
 
         let layout: Element<'_, ApplicationMessage> = container(content)
             .width(Length::Fill)
@@ -119,31 +133,8 @@ impl Application {
             .into();
 
         if let Some(modal) = &self.active_modal {
-            let modal_content = modal.view();
-
-            let overlay = button(
-                container(modal_content)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .align_x(Alignment::Center)
-                    .align_y(Alignment::Center),
-            )
-            .on_press(ApplicationMessage::CloseModal)
-            .style(button::text)
-            .width(Length::Fill)
-            .height(Length::Fill);
-
-            let styled_overlay = container(overlay)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .style(|_| container::Style {
-                    background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
-                    ..Default::default()
-                })
-                .align_x(Alignment::Center)
-                .align_y(Alignment::Center);
-
-            stack![layout, styled_overlay].into()
+            let modal_content = modal::open(modal);
+            stack![layout, modal_content].into()
         } else {
             layout
         }
