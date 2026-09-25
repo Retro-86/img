@@ -1,10 +1,11 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{write, Display, Formatter};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     ImageFileCreateFailed(PathBuf, String),
     ImageFileOpenFailed(PathBuf, String),
+    FileCreateFailed(String, String),
 }
 
 impl std::error::Error for Error {}
@@ -17,6 +18,9 @@ impl Display for Error {
             }
             Error::ImageFileOpenFailed(path, error) => {
                 write!(formatter, "Failed to open image file: {} {}", path.display(), error)
+            }
+            Error::FileCreateFailed(file, error) => {
+                write!(formatter, "Failed create file in image: {} {}", file, error)
             }
         }
     }

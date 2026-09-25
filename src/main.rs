@@ -6,11 +6,11 @@ mod modal;
 
 use crate::error::Error;
 use crate::image::ImageFile;
-use crate::modal::{Modal, ModalMessage, create, exit};
-use fatfs::FileSystem;
+use crate::modal::{Modal, ModalMessage, create, exit, file};
+use fatfs::{DirEntry, FileSystem};
 use fscommon::BufStream;
-use iced::widget::{Button, Column, button, container, stack, text};
-use iced::{Element, Length, Size, Task, Theme, window};
+use iced::widget::{Button, Column, Row, button, container, stack, text};
+use iced::{Alignment, Element, Length, Size, Task, Theme, window};
 use iced_aw::{menu, menu_bar};
 use std::fs::File;
 use std::path::PathBuf;
@@ -39,6 +39,7 @@ pub enum ApplicationMessage {
     OpenModal(Modal),
     CloseModal,
     ModalAction(ModalMessage),
+    CreateFileInImage(String),
 }
 
 impl Application {
@@ -59,23 +60,24 @@ impl Application {
                 match file_system {
                     Ok(file_system) => self.file_system = Some(file_system),
                     Err(error) => {
-                        self.show_error(Error::ImageFileOpenFailed(path, error.to_string()))
+                        return self
+                            .show_error(Error::ImageFileOpenFailed(path, error.to_string()));
                     }
                 }
             }
             ApplicationMessage::CreateImageFile(image_file) => {
                 let file_system = image::create(&image_file);
 
-                match file_system {
+                return match file_system {
                     Ok(file_system) => {
                         self.file_system = Some(file_system);
-                        return Task::done(ApplicationMessage::CloseModal);
+                        Task::done(ApplicationMessage::CloseModal)
                     }
                     Err(error) => self.show_error(Error::ImageFileCreateFailed(
                         image_file.path,
                         error.to_string(),
                     )),
-                }
+                };
             }
             ApplicationMessage::OpenModal(modal) => self.active_modal = Some(modal),
             ApplicationMessage::Exit => return window::latest().and_then(window::close),
@@ -84,6 +86,21 @@ impl Application {
                 return match &mut self.active_modal {
                     Some(modal) => modal.update(message),
                     None => Task::none(),
+                };
+            }
+            ApplicationMessage::CreateFileInImage(name) => {
+                let result = if let Some(file_system) = self.file_system.as_mut() {
+                    match file_system.root_dir().create_file(&name) {
+                        Ok(_) => Ok(()),
+                        Err(error) => Err(error),
+                    }
+                } else {
+                    Ok(())
+                };
+
+                return match result {
+                    Ok(_) => Task::done(ApplicationMessage::CloseModal),
+                    Err(error) => self.show_error(Error::FileCreateFailed(name, error.to_string())),
                 };
             }
         }
@@ -114,12 +131,17 @@ impl Application {
 
         let menu_bar = menu_bar!((text("Файл").size(14), file_menu),);
 
-        let body = container(text(format!(
-            "FileSystem={:?}",
-            self.file_system
-                .as_ref()
-                .map(|system| system.volume_label())
-        )));
+        let body = container(
+            match self.file_system {
+                Some(_) => self.view_file_list(),
+                None => text("Please open or create image")
+                    .align_y(Alignment::Center)
+                    .align_x(Alignment::Center)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .into()
+            }
+        );
 
         let content = Column::new()
             .padding(8)
@@ -140,8 +162,10 @@ impl Application {
         }
     }
 
-    fn show_error(&mut self, error: Error) {
-        self.active_modal = Some(Modal::Error(modal::error::Modal::new(error)));
+    fn show_error(&mut self, error: Error) -> Task<ApplicationMessage> {
+        Task::done(ApplicationMessage::OpenModal(Modal::Error(
+            modal::error::Modal::new(error),
+        )))
     }
 
     fn theme(&self) -> Theme {
@@ -151,4 +175,44 @@ impl Application {
             self.theme.clone().unwrap()
         }
     }
+
+    fn view_file_list(&self) -> Element<'_, ApplicationMessage> {
+        let mut list = Column::new().spacing(2);
+
+        if let Some(file_system) = &self.file_system {
+            for entry in file_system.root_dir().iter() {
+                match entry {
+                    Ok(value) => {
+                        let file = file_entry(value);
+                        list = list.push(file);
+                    }
+                    Err(error) => {}
+                }
+            }
+        }
+
+        list = list.push(
+            button("Create file").on_press(ApplicationMessage::OpenModal(Modal::FileCreate(
+                file::CreateModal::default(),
+            ))),
+        );
+
+        list.into()
+    }
+}
+
+fn file_entry<'a>(entry: DirEntry<BufStream<File>>) -> Element<'a, ApplicationMessage> {
+    let icon = if entry.is_dir() { "📁 " } else { "📄 " };
+
+    Button::new(
+        Row::new()
+            .spacing(10)
+            .align_y(iced::Alignment::Center)
+            .push(text(icon).size(16))
+            .push(text(entry.file_name()).size(14)),
+    )
+    .style(button::text)
+    .width(Length::Fill)
+    .padding(6)
+    .into()
 }

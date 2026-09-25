@@ -1,6 +1,7 @@
 pub mod create;
 pub mod error;
 pub mod exit;
+pub mod file;
 
 use crate::ApplicationMessage;
 use iced::widget::container;
@@ -17,6 +18,7 @@ pub enum ModalMessage {
     Create(create::Message),
     Exit,
     Error,
+    FileCreate(file::CreateMessage),
 }
 
 #[derive(Debug, Clone)]
@@ -24,6 +26,7 @@ pub enum Modal {
     Exit(exit::Modal),
     Error(error::Modal),
     Create(create::Modal),
+    FileCreate(file::CreateModal),
 }
 
 impl Modal {
@@ -35,6 +38,10 @@ impl Modal {
                 .view()
                 .map(ModalMessage::Create)
                 .map(ApplicationMessage::ModalAction),
+            Modal::FileCreate(window) => window
+                .view()
+                .map(ModalMessage::FileCreate)
+                .map(ApplicationMessage::ModalAction),
         }
     }
 
@@ -42,6 +49,9 @@ impl Modal {
         match (self, message) {
             (Self::Create(modal), ModalMessage::Create(message)) => {
                 modal.update(message).map(map_create_event)
+            }
+            (Self::FileCreate(modal), ModalMessage::FileCreate(message)) => {
+                modal.update(message).map(map_file_create_event)
             }
 
             _ => Task::none(),
@@ -55,6 +65,15 @@ fn map_create_event(event: create::Event) -> ApplicationMessage {
             ApplicationMessage::ModalAction(ModalMessage::Create(message))
         }
         create::Event::Submitted(image) => ApplicationMessage::CreateImageFile(image),
+    }
+}
+
+fn map_file_create_event(event: file::CreateEvent) -> ApplicationMessage {
+    match event {
+        file::CreateEvent::Message(message) => {
+            ApplicationMessage::ModalAction(ModalMessage::FileCreate(message))
+        }
+        file::CreateEvent::Submitted(file_name) => ApplicationMessage::CreateFileInImage(file_name),
     }
 }
 
