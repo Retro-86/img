@@ -110,38 +110,58 @@ impl Application {
 
     fn view(&self) -> Element<'_, ApplicationMessage> {
         let file_menu = menu!(
-            (Button::new(text("Открыть образ").size(14))
+            (Button::new(text("Open").size(14))
                 .on_press(ApplicationMessage::SelectImageFile)
+                .padding([6, 12])
                 .style(button::text)
                 .width(Length::Fill)),
-            (Button::new(text("Создать образ").size(14))
+            (Button::new(text("Create").size(14))
                 .on_press(ApplicationMessage::OpenModal(Modal::Create(
                     create::Modal::default()
                 )))
+                .padding([6, 12])
                 .style(button::text)
                 .width(Length::Fill)),
-            (Button::new(text("Выход").size(14))
+            (Button::new(text("Exit").size(14))
                 .on_press(ApplicationMessage::OpenModal(Modal::Exit(
                     exit::Modal::default()
                 )))
+                .padding([6, 12])
                 .style(button::text)
                 .width(Length::Fill))
         )
-        .width(150.0);
+        .width(100);
 
-        let menu_bar = menu_bar!((text("Файл").size(14), file_menu),);
+        let image_menu = menu!(
+            (Button::new(text("Create file").size(14))
+                .on_press_maybe(match self.file_system {
+                    None => None,
+                    Some(_) => Some(ApplicationMessage::OpenModal(Modal::FileCreate(
+                        file::create::Modal::default()
+                    ))),
+                })
+                .padding([6, 4])
+                .style(button::text)
+                .width(Length::Fill))
+        )
+        .width(75);
 
-        let body = container(
-            match self.file_system {
-                Some(_) => self.view_file_list(),
-                None => text("Please open or create image")
-                    .align_y(Alignment::Center)
-                    .align_x(Alignment::Center)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .into()
-            }
-        );
+        let menu_bar = menu_bar!(
+            (text("File").size(14), file_menu),
+            (text("Image").size(14), image_menu)
+        )
+        .width(Length::Fill)
+        .spacing(20);
+
+        let body = container(match self.file_system {
+            Some(_) => self.view_file_list(),
+            None => text("Please open or create image")
+                .align_y(Alignment::Center)
+                .align_x(Alignment::Center)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into(),
+        });
 
         let content = Column::new()
             .padding(8)
@@ -193,7 +213,7 @@ impl Application {
 
         list = list.push(
             button("Create file").on_press(ApplicationMessage::OpenModal(Modal::FileCreate(
-                file::CreateModal::default(),
+                file::create::Modal::default(),
             ))),
         );
 

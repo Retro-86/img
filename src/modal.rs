@@ -18,7 +18,7 @@ pub enum ModalMessage {
     Create(create::Message),
     Exit,
     Error,
-    FileCreate(file::CreateMessage),
+    FileCreate(file::create::Message),
 }
 
 #[derive(Debug, Clone)]
@@ -26,7 +26,7 @@ pub enum Modal {
     Exit(exit::Modal),
     Error(error::Modal),
     Create(create::Modal),
-    FileCreate(file::CreateModal),
+    FileCreate(file::create::Modal),
 }
 
 impl Modal {
@@ -68,12 +68,12 @@ fn map_create_event(event: create::Event) -> ApplicationMessage {
     }
 }
 
-fn map_file_create_event(event: file::CreateEvent) -> ApplicationMessage {
+fn map_file_create_event(event: file::create::Event) -> ApplicationMessage {
     match event {
-        file::CreateEvent::Message(message) => {
+        file::create::Event::Message(message) => {
             ApplicationMessage::ModalAction(ModalMessage::FileCreate(message))
         }
-        file::CreateEvent::Submitted(file_name) => ApplicationMessage::CreateFileInImage(file_name),
+        file::create::Event::Submitted(file_name) => ApplicationMessage::CreateFileInImage(file_name),
     }
 }
 
