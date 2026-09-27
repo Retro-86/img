@@ -6,6 +6,8 @@ pub enum Error {
     ImageFileCreateFailed(PathBuf, String),
     ImageFileOpenFailed(PathBuf, String),
     FileCreateFailed(String, String),
+    FileDropFailed(String, String),
+    FileSystemUnmountFailed(String),
 }
 
 impl std::error::Error for Error {}
@@ -21,6 +23,12 @@ impl Display for Error {
             }
             Error::FileCreateFailed(file, error) => {
                 write!(formatter, "Failed create file in image: {} {}", file, error)
+            }
+            Error::FileSystemUnmountFailed(error) => {
+                write!(formatter, "Failed to unmount image file: {}", error)
+            }
+            Error::FileDropFailed(path, error) => {
+                write!(formatter, "Failed drop file to image: {} {}", path, error)
             }
         }
     }

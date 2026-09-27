@@ -84,7 +84,7 @@ impl ModalWindow for Modal {
                         .spacing(2),
                 )
                 .push(
-                    button("Create image")
+                    button("Create")
                         .style(button::primary)
                         .on_press(Message::ImageFileCreate),
                 ),
@@ -102,7 +102,13 @@ impl Modal {
             Message::ImageFileNameChanged(value) => self.file_name = value,
             Message::ImageFilePathChanged(value) => self.file_path = value,
             Message::ImageFileSizeChanged(value) => self.image_size = value,
-            Message::ImageFileCreate => return Task::done(Event::Submitted(self.image_file())),
+            Message::ImageFileCreate => {
+                if self.file_path.is_empty() || self.file_name.is_empty() {
+                    
+                }
+
+                return Task::done(Event::Submitted(self.image_file()))
+            },
             Message::ImageFileSelectPath => {
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     return Task::done(Event::Message(Message::ImageFilePathSelected(path)));

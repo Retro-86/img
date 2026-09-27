@@ -10,13 +10,16 @@ use crate::modal::{Modal, ModalMessage, create, exit, file};
 use fatfs::{DirEntry, FileSystem};
 use fscommon::BufStream;
 use iced::widget::{Button, Column, Row, button, container, stack, text};
-use iced::{Alignment, Element, Length, Size, Task, Theme, window};
+use iced::{Alignment, Element, Event, Length, Size, Subscription, Task, Theme, event, window};
 use iced_aw::{menu, menu_bar};
 use std::fs::File;
+use std::io;
+use std::io::Write;
 use std::path::PathBuf;
 
 fn main() -> iced::Result {
     iced::application(Application::default, Application::update, Application::view)
+        .subscription(Application::subscription)
         .theme(Application::theme)
         .title("img")
         .window_size(Size::new(1000.0, 600.0))
@@ -40,6 +43,7 @@ pub enum ApplicationMessage {
     CloseModal,
     ModalAction(ModalMessage),
     CreateFileInImage(String),
+    EventOccurred(Event),
 }
 
 impl Application {
@@ -55,9 +59,11 @@ impl Application {
                 };
             }
             ApplicationMessage::OpenImageFile(path) => {
-                let file_system = image::open(&path);
+                if let Some(task) = self.unmount_image() {
+                    return task;
+                }
 
-                match file_system {
+                match image::open(&path) {
                     Ok(file_system) => self.file_system = Some(file_system),
                     Err(error) => {
                         return self
@@ -66,9 +72,11 @@ impl Application {
                 }
             }
             ApplicationMessage::CreateImageFile(image_file) => {
-                let file_system = image::create(&image_file);
+                if let Some(task) = self.unmount_image() {
+                    return task;
+                }
 
-                return match file_system {
+                return match image::create(&image_file) {
                     Ok(file_system) => {
                         self.file_system = Some(file_system);
                         Task::done(ApplicationMessage::CloseModal)
@@ -83,10 +91,9 @@ impl Application {
             ApplicationMessage::Exit => return window::latest().and_then(window::close),
             ApplicationMessage::CloseModal => self.active_modal = None,
             ApplicationMessage::ModalAction(message) => {
-                return match &mut self.active_modal {
-                    Some(modal) => modal.update(message),
-                    None => Task::none(),
-                };
+                if let Some(modal) = &mut self.active_modal {
+                    return modal.update(message);
+                }
             }
             ApplicationMessage::CreateFileInImage(name) => {
                 let result = if let Some(file_system) = self.file_system.as_mut() {
@@ -103,6 +110,59 @@ impl Application {
                     Err(error) => self.show_error(Error::FileCreateFailed(name, error.to_string())),
                 };
             }
+            ApplicationMessage::EventOccurred(event) => match event {
+                Event::Window(window_event) => match window_event {
+                    window::Event::FileDropped(path) => {
+                        if path.is_file() {
+                            let file_name = path
+                                .file_name()
+                                .map(|n| n.to_string_lossy().into_owned())
+                                .unwrap_or_else(|| "unnamed_file".to_string());
+
+                            let mut source_file = match File::open(&path) {
+                                Ok(f) => f,
+                                Err(error) => {
+                                    return self.show_error(Error::FileDropFailed(
+                                        file_name,
+                                        error.to_string(),
+                                    ));
+                                }
+                            };
+
+                            let result: Result<(), String> = (|| {
+                                let file_system = self
+                                    .file_system
+                                    .as_mut()
+                                    .ok_or_else(|| "FileSystem not initialized".to_string())?;
+
+                                let root_directory = file_system.root_dir();
+                                let mut file = root_directory
+                                    .create_file(&file_name)
+                                    .map_err(|error| error.to_string())?;
+
+                                file
+                                    .truncate()
+                                    .and_then(|_| {
+                                        io::copy(&mut source_file, &mut file).map(|_| ())
+                                    })
+                                    .and_then(|_| file.flush())
+                                    .map_err(|error| error.to_string())?;
+
+                                Ok(())
+                            })();
+
+                            if let Err(error) = result {
+                                return self.show_error(Error::FileDropFailed(
+                                    path.display().to_string(),
+                                    error.to_string(),
+                                ));
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
         }
 
         Task::none()
@@ -182,6 +242,10 @@ impl Application {
         }
     }
 
+    fn subscription(&self) -> Subscription<ApplicationMessage> {
+        event::listen().map(ApplicationMessage::EventOccurred)
+    }
+
     fn show_error(&mut self, error: Error) -> Task<ApplicationMessage> {
         Task::done(ApplicationMessage::OpenModal(Modal::Error(
             modal::error::Modal::new(error),
@@ -200,7 +264,9 @@ impl Application {
         let mut list = Column::new().spacing(2);
 
         if let Some(file_system) = &self.file_system {
-            for entry in file_system.root_dir().iter() {
+            let root_directory_iterator = file_system.root_dir().iter();
+
+            for entry in root_directory_iterator {
                 match entry {
                     Ok(value) => {
                         let file = file_entry(value);
@@ -211,13 +277,17 @@ impl Application {
             }
         }
 
-        list = list.push(
-            button("Create file").on_press(ApplicationMessage::OpenModal(Modal::FileCreate(
-                file::create::Modal::default(),
-            ))),
-        );
-
         list.into()
+    }
+
+    fn unmount_image(&mut self) -> Option<Task<ApplicationMessage>> {
+        if let Some(file_system) = self.file_system.take() {
+            if let Err(error) = file_system.unmount() {
+                return Some(self.show_error(Error::FileSystemUnmountFailed(error.to_string())));
+            }
+        }
+
+        None
     }
 }
 
@@ -227,7 +297,7 @@ fn file_entry<'a>(entry: DirEntry<BufStream<File>>) -> Element<'a, ApplicationMe
     Button::new(
         Row::new()
             .spacing(10)
-            .align_y(iced::Alignment::Center)
+            .align_y(Alignment::Center)
             .push(text(icon).size(16))
             .push(text(entry.file_name()).size(14)),
     )
