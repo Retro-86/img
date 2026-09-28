@@ -44,6 +44,8 @@ pub enum ApplicationMessage {
     ModalAction(ModalMessage),
     CreateFileInImage(String),
     EventOccurred(Event),
+    AddFileToImage(PathBuf),
+    SelectFileAddToImage,
 }
 
 impl Application {
@@ -114,55 +116,65 @@ impl Application {
                 Event::Window(window_event) => match window_event {
                     window::Event::FileDropped(path) => {
                         if path.is_file() {
-                            let file_name = path
-                                .file_name()
-                                .map(|n| n.to_string_lossy().into_owned())
-                                .unwrap_or_else(|| "unnamed_file".to_string());
-
-                            let mut source_file = match File::open(&path) {
-                                Ok(f) => f,
-                                Err(error) => {
-                                    return self.show_error(Error::FileDropFailed(
-                                        file_name,
-                                        error.to_string(),
-                                    ));
-                                }
-                            };
-
-                            let result: Result<(), String> = (|| {
-                                let file_system = self
-                                    .file_system
-                                    .as_mut()
-                                    .ok_or_else(|| "FileSystem not initialized".to_string())?;
-
-                                let root_directory = file_system.root_dir();
-                                let mut file = root_directory
-                                    .create_file(&file_name)
-                                    .map_err(|error| error.to_string())?;
-
-                                file
-                                    .truncate()
-                                    .and_then(|_| {
-                                        io::copy(&mut source_file, &mut file).map(|_| ())
-                                    })
-                                    .and_then(|_| file.flush())
-                                    .map_err(|error| error.to_string())?;
-
-                                Ok(())
-                            })();
-
-                            if let Err(error) = result {
-                                return self.show_error(Error::FileDropFailed(
-                                    path.display().to_string(),
-                                    error.to_string(),
-                                ));
-                            }
+                            return Task::done(ApplicationMessage::AddFileToImage(path));
                         }
                     }
                     _ => {}
                 },
                 _ => {}
             },
+            ApplicationMessage::AddFileToImage(file_path) => {
+                let file_name = file_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "unnamed_file".to_string());
+
+                let mut source_file = match File::open(&file_path) {
+                    Ok(f) => f,
+                    Err(error) => {
+                        return self.show_error(Error::FileDropFailed(
+                            file_name,
+                            error.to_string(),
+                        ));
+                    }
+                };
+
+                let result: Result<(), String> = (|| {
+                    let file_system = self
+                        .file_system
+                        .as_mut()
+                        .ok_or_else(|| "FileSystem not initialized".to_string())?;
+
+                    let root_directory = file_system.root_dir();
+                    let mut file = root_directory
+                        .create_file(&file_name)
+                        .map_err(|error| error.to_string())?;
+
+                    file
+                        .truncate()
+                        .and_then(|_| {
+                            io::copy(&mut source_file, &mut file).map(|_| ())
+                        })
+                        .and_then(|_| file.flush())
+                        .map_err(|error| error.to_string())?;
+
+                    Ok(())
+                })();
+
+                if let Err(error) = result {
+                    return self.show_error(Error::FileDropFailed(
+                        file_path.display().to_string(),
+                        error.to_string(),
+                    ));
+                }
+            }
+            ApplicationMessage::SelectFileAddToImage => {
+                let file_path = rfd::FileDialog::new().pick_file();
+
+                if let Some(file_path) = file_path {
+                    return Task::done(ApplicationMessage::AddFileToImage(file_path));
+                }
+            }
         }
 
         Task::none()
@@ -199,6 +211,14 @@ impl Application {
                     Some(_) => Some(ApplicationMessage::OpenModal(Modal::FileCreate(
                         file::create::Modal::default()
                     ))),
+                })
+                .padding([6, 4])
+                .style(button::text)
+                .width(Length::Fill)),
+            (Button::new(text("Add file").size(14))
+                .on_press_maybe(match self.file_system {
+                    None => None,
+                    Some(_) => Some(ApplicationMessage::SelectFileAddToImage),
                 })
                 .padding([6, 4])
                 .style(button::text)
