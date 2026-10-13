@@ -3,13 +3,15 @@
 pub mod error;
 pub mod image;
 mod modal;
+pub mod widget;
 
 use crate::error::Error;
 use crate::image::ImageFile;
 use crate::modal::{Modal, ModalMessage, create, exit, file};
-use fatfs::{DirEntry, FileSystem};
+use crate::widget::file_explorer::{FileExplorerMessage, FileExplorerWidget};
+use fatfs::FileSystem;
 use fscommon::BufStream;
-use iced::widget::{Button, Column, Row, button, container, stack, text};
+use iced::widget::{Button, Column, button, container, stack, text};
 use iced::{Alignment, Element, Event, Length, Size, Subscription, Task, Theme, event, window};
 use iced_aw::{menu, menu_bar};
 use std::fs::File;
@@ -46,6 +48,7 @@ pub enum ApplicationMessage {
     EventOccurred(Event),
     AddFileToImage(PathBuf),
     SelectFileAddToImage,
+    FileExplorer(FileExplorerMessage),
 }
 
 impl Application {
@@ -132,10 +135,8 @@ impl Application {
                 let mut source_file = match File::open(&file_path) {
                     Ok(f) => f,
                     Err(error) => {
-                        return self.show_error(Error::FileDropFailed(
-                            file_name,
-                            error.to_string(),
-                        ));
+                        return self
+                            .show_error(Error::FileDropFailed(file_name, error.to_string()));
                     }
                 };
 
@@ -150,11 +151,8 @@ impl Application {
                         .create_file(&file_name)
                         .map_err(|error| error.to_string())?;
 
-                    file
-                        .truncate()
-                        .and_then(|_| {
-                            io::copy(&mut source_file, &mut file).map(|_| ())
-                        })
+                    file.truncate()
+                        .and_then(|_| io::copy(&mut source_file, &mut file).map(|_| ()))
                         .and_then(|_| file.flush())
                         .map_err(|error| error.to_string())?;
 
@@ -175,6 +173,7 @@ impl Application {
                     return Task::done(ApplicationMessage::AddFileToImage(file_path));
                 }
             }
+            ApplicationMessage::FileExplorer(message) => match message {},
         }
 
         Task::none()
@@ -233,8 +232,10 @@ impl Application {
         .width(Length::Fill)
         .spacing(20);
 
-        let body = container(match self.file_system {
-            Some(_) => self.view_file_list(),
+        let body = container(match &self.file_system {
+            Some(file_system) => FileExplorerWidget::new()
+                .view(file_system)
+                .map(ApplicationMessage::FileExplorer),
             None => text("Please open or create image")
                 .align_y(Alignment::Center)
                 .align_x(Alignment::Center)
@@ -280,26 +281,6 @@ impl Application {
         }
     }
 
-    fn view_file_list(&self) -> Element<'_, ApplicationMessage> {
-        let mut list = Column::new().spacing(2);
-
-        if let Some(file_system) = &self.file_system {
-            let root_directory_iterator = file_system.root_dir().iter();
-
-            for entry in root_directory_iterator {
-                match entry {
-                    Ok(value) => {
-                        let file = file_entry(value);
-                        list = list.push(file);
-                    }
-                    Err(error) => {}
-                }
-            }
-        }
-
-        list.into()
-    }
-
     fn unmount_image(&mut self) -> Option<Task<ApplicationMessage>> {
         if let Some(file_system) = self.file_system.take() {
             if let Err(error) = file_system.unmount() {
@@ -309,20 +290,4 @@ impl Application {
 
         None
     }
-}
-
-fn file_entry<'a>(entry: DirEntry<BufStream<File>>) -> Element<'a, ApplicationMessage> {
-    let icon = if entry.is_dir() { "📁 " } else { "📄 " };
-
-    Button::new(
-        Row::new()
-            .spacing(10)
-            .align_y(Alignment::Center)
-            .push(text(icon).size(16))
-            .push(text(entry.file_name()).size(14)),
-    )
-    .style(button::text)
-    .width(Length::Fill)
-    .padding(6)
-    .into()
 }
