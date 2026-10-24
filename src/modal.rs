@@ -4,7 +4,7 @@ pub mod exit;
 pub mod file;
 
 use crate::ApplicationMessage;
-use iced::widget::container;
+use iced::widget::{container, button, stack, text};
 use iced::{Alignment, Background, Color, Element, Length, Task};
 
 pub trait ModalWindow {
@@ -80,14 +80,34 @@ fn map_file_create_event(event: file::create::Event) -> ApplicationMessage {
 pub fn open(modal: &Modal) -> Element<'_, ApplicationMessage> {
     let modal_content = modal.view();
 
-    container(modal_content)
+    let close_button = container(
+        button(text("✕"))
+            .on_press(ApplicationMessage::CloseModal)
+            .style(|_theme, _status| button::Style {
+                background: Some(Background::Color(Color::TRANSPARENT)),
+                text_color: Color::from_rgb(0.7, 0.7, 0.7),
+                ..Default::default()
+            })
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .align_x(Alignment::End)       
+    .align_y(Alignment::Start)
+    .padding(5);
+
+    let modal_container_content = stack![modal_content, close_button];
+
+    let modal_container = container(modal_container_content)
+        .style(move |_theme| container::Style {
+            background: Some(Background::Color(Color::from_rgb(0.17, 0.19, 0.22))),
+            ..Default::default()
+        });
+
+    container(modal_container)
         .width(Length::Fill)
         .height(Length::Fill)
-        .style(|_| container::Style {
-            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
-            ..Default::default()
-        })
         .align_x(Alignment::Center)
         .align_y(Alignment::Center)
         .into()
 }
+
