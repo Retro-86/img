@@ -1,6 +1,6 @@
 use gpui_kit::component::Theme;
 use gpui_kit::component::button::Button;
-use gpui_kit::{div, px, transparent_black, Div, ElementId, Fill, IntoElement, ParentElement, Styled, InteractiveElement};
+use gpui_kit::{Div, ElementId, IntoElement, ParentElement, Styled, div, px, transparent_black};
 
 pub fn button(id: impl Into<ElementId>) -> Button {
     Button::new(id)
@@ -20,6 +20,6 @@ pub fn application_content(theme: &Theme) -> Div {
         .font_family("Nordwand Mono")
 }
 
-pub fn title_item(child: impl IntoElement) -> Div {
-    div().flex().items_center().child(child)
+pub fn title_items(children: Vec<impl IntoElement>) -> Div {
+    div().flex().items_center().children(children)
 }

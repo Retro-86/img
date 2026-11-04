@@ -16,8 +16,8 @@ impl Render for Application {
 
         component::application_content(theme)
             .child(
-                TitleBar::new().child(
-                    component::title_item(
+                TitleBar::new()
+                    .child(component::title_items(vec![
                         component::button("file")
                             .label("File")
                             .text_color(theme.foreground)
@@ -27,8 +27,6 @@ impl Render for Application {
                                     .separator()
                                     .menu("Quit", Box::new(Quit))
                             }),
-                    )
-                    .child(component::title_item(
                         component::button("image")
                             .label("Image")
                             .text_color(theme.foreground)
@@ -36,9 +34,8 @@ impl Render for Application {
                                 menu.menu("Create file", Box::new(CreateFile))
                                     .menu("Add file", Box::new(AddFile))
                             }),
-                    ))
+                    ]))
                     .bg(theme.title_bar),
-                ),
             )
             .on_action::<Quit>(|_, _, context| context.quit())
     }
@@ -70,5 +67,7 @@ fn main() {
     });
 }
 
-actions!(application, [Quit]);
-actions!(image, [CreateImage, OpenImage, AddFile, CreateFile]);
+actions!(
+    application,
+    [Quit, CreateImage, OpenImage, AddFile, CreateFile]
+);
