@@ -3175,6 +3175,7 @@ version = "0.1.0"
 dependencies = [
  "gpui-kit",
  "native-theme-gpui",
+ "regex",
 ]
 
 [[package]]

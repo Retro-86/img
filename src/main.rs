@@ -1,4 +1,5 @@
 pub mod component;
+pub mod dialog;
 
 use gpui_kit::component::menu::DropdownMenu;
 use gpui_kit::component::{ActiveTheme, TitleBar};
@@ -38,6 +39,9 @@ impl Render for Application {
                     .bg(theme.title_bar),
             )
             .on_action::<Quit>(|_, _, context| context.quit())
+            .on_action::<CreateImage>(|_, window, context| {
+                dialog::CreateImageDialog::open(window, context);
+            })
     }
 }
 
