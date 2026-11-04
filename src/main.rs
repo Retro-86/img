@@ -1,293 +1,74 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+pub mod component;
 
-pub mod error;
-pub mod image;
-mod modal;
-pub mod widget;
+use gpui_kit::component::menu::DropdownMenu;
+use gpui_kit::component::{ActiveTheme, TitleBar};
+use gpui_kit::{
+    AppContext, Context, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
+    Styled, TitlebarOptions, Window, WindowOptions, actions, application,
+};
+use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
 
-use crate::error::Error;
-use crate::image::ImageFile;
-use crate::modal::{Modal, ModalMessage, create, exit, file};
-use crate::widget::file_explorer::{FileExplorerMessage, FileExplorerWidget};
-use fatfs::FileSystem;
-use fscommon::BufStream;
-use iced::widget::{Button, Column, button, container, stack, text};
-use iced::{Alignment, Element, Event, Length, Size, Subscription, Task, Theme, event, window};
-use iced_aw::{menu, menu_bar};
-use std::fs::File;
-use std::io;
-use std::io::Write;
-use std::path::PathBuf;
+pub struct Application;
 
-fn main() -> iced::Result {
-    iced::application(Application::default, Application::update, Application::view)
-        .subscription(Application::subscription)
-        .theme(Application::theme)
-        .title("img")
-        .window_size(Size::new(1000.0, 600.0))
-        .run()
-}
+impl Render for Application {
+    fn render(&mut self, window: &mut Window, context: &mut Context<Self>) -> impl IntoElement {
+        let theme = context.theme();
 
-#[derive(Default)]
-struct Application {
-    theme: Option<Theme>,
-    file_system: Option<FileSystem<BufStream<File>>>,
-    active_modal: Option<Modal>,
-}
-
-#[derive(Debug, Clone)]
-pub enum ApplicationMessage {
-    SelectImageFile,
-    OpenImageFile(PathBuf),
-    CreateImageFile(ImageFile),
-    Exit,
-    OpenModal(Modal),
-    CloseModal,
-    ModalAction(ModalMessage),
-    CreateFileInImage(String),
-    EventOccurred(Event),
-    AddFileToImage(PathBuf),
-    SelectFileAddToImage,
-    FileExplorer(FileExplorerMessage),
-}
-
-impl Application {
-    fn update(&mut self, message: ApplicationMessage) -> Task<ApplicationMessage> {
-        match message {
-            ApplicationMessage::SelectImageFile => {
-                let picked_image_file_path = rfd::FileDialog::new()
-                    .add_filter("Image file", &["img"])
-                    .pick_file();
-
-                if let Some(image_file_path) = picked_image_file_path {
-                    return Task::done(ApplicationMessage::OpenImageFile(image_file_path));
-                };
-            }
-            ApplicationMessage::OpenImageFile(path) => {
-                if let Some(task) = self.unmount_image() {
-                    return task;
-                }
-
-                match image::open(&path) {
-                    Ok(file_system) => self.file_system = Some(file_system),
-                    Err(error) => {
-                        return self
-                            .show_error(Error::ImageFileOpenFailed(path, error.to_string()));
-                    }
-                }
-            }
-            ApplicationMessage::CreateImageFile(image_file) => {
-                if let Some(task) = self.unmount_image() {
-                    return task;
-                }
-
-                return match image::create(&image_file) {
-                    Ok(file_system) => {
-                        self.file_system = Some(file_system);
-                        Task::done(ApplicationMessage::CloseModal)
-                    }
-                    Err(error) => self.show_error(Error::ImageFileCreateFailed(
-                        image_file.path,
-                        error.to_string(),
-                    )),
-                };
-            }
-            ApplicationMessage::OpenModal(modal) => self.active_modal = Some(modal),
-            ApplicationMessage::Exit => return window::latest().and_then(window::close),
-            ApplicationMessage::CloseModal => self.active_modal = None,
-            ApplicationMessage::ModalAction(message) => {
-                if let Some(modal) = &mut self.active_modal {
-                    return modal.update(message);
-                }
-            }
-            ApplicationMessage::CreateFileInImage(name) => {
-                let result = if let Some(file_system) = self.file_system.as_mut() {
-                    match file_system.root_dir().create_file(&name) {
-                        Ok(_) => Ok(()),
-                        Err(error) => Err(error),
-                    }
-                } else {
-                    Ok(())
-                };
-
-                return match result {
-                    Ok(_) => Task::done(ApplicationMessage::CloseModal),
-                    Err(error) => self.show_error(Error::FileCreateFailed(name, error.to_string())),
-                };
-            }
-            ApplicationMessage::EventOccurred(event) => match event {
-                Event::Window(window_event) => match window_event {
-                    window::Event::FileDropped(path) => {
-                        if path.is_file() {
-                            return Task::done(ApplicationMessage::AddFileToImage(path));
-                        }
-                    }
-                    _ => {}
-                },
-                _ => {}
-            },
-            ApplicationMessage::AddFileToImage(file_path) => {
-                let file_name = file_path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "unnamed_file".to_string());
-
-                let mut source_file = match File::open(&file_path) {
-                    Ok(f) => f,
-                    Err(error) => {
-                        return self
-                            .show_error(Error::FileDropFailed(file_name, error.to_string()));
-                    }
-                };
-
-                let result: Result<(), String> = (|| {
-                    let file_system = self
-                        .file_system
-                        .as_mut()
-                        .ok_or_else(|| "FileSystem not initialized".to_string())?;
-
-                    let root_directory = file_system.root_dir();
-                    let mut file = root_directory
-                        .create_file(&file_name)
-                        .map_err(|error| error.to_string())?;
-
-                    file.truncate()
-                        .and_then(|_| io::copy(&mut source_file, &mut file).map(|_| ()))
-                        .and_then(|_| file.flush())
-                        .map_err(|error| error.to_string())?;
-
-                    Ok(())
-                })();
-
-                if let Err(error) = result {
-                    return self.show_error(Error::FileDropFailed(
-                        file_path.display().to_string(),
-                        error.to_string(),
-                    ));
-                }
-            }
-            ApplicationMessage::SelectFileAddToImage => {
-                let file_path = rfd::FileDialog::new().pick_file();
-
-                if let Some(file_path) = file_path {
-                    return Task::done(ApplicationMessage::AddFileToImage(file_path));
-                }
-            }
-            ApplicationMessage::FileExplorer(message) => match message {},
-        }
-
-        Task::none()
-    }
-
-    fn view(&self) -> Element<'_, ApplicationMessage> {
-        let file_menu = menu!(
-            (Button::new(text("Open").size(14))
-                .on_press(ApplicationMessage::SelectImageFile)
-                .padding([6, 12])
-                .style(button::text)
-                .width(Length::Fill)),
-            (Button::new(text("Create").size(14))
-                .on_press(ApplicationMessage::OpenModal(Modal::Create(
-                    create::Modal::default()
-                )))
-                .padding([6, 12])
-                .style(button::text)
-                .width(Length::Fill)),
-            (Button::new(text("Exit").size(14))
-                .on_press(ApplicationMessage::OpenModal(Modal::Exit(
-                    exit::Modal::default()
-                )))
-                .padding([6, 12])
-                .style(button::text)
-                .width(Length::Fill))
-        )
-        .width(100);
-
-        let image_menu = menu!(
-            (Button::new(text("Create file").size(14))
-                .on_press_maybe(match self.file_system {
-                    None => None,
-                    Some(_) => Some(ApplicationMessage::OpenModal(Modal::FileCreate(
-                        file::create::Modal::default()
-                    ))),
-                })
-                .padding([6, 4])
-                .style(button::text)
-                .width(Length::Fill)),
-            (Button::new(text("Add file").size(14))
-                .on_press_maybe(match self.file_system {
-                    None => None,
-                    Some(_) => Some(ApplicationMessage::SelectFileAddToImage),
-                })
-                .padding([6, 4])
-                .style(button::text)
-                .width(Length::Fill))
-        )
-        .width(75);
-
-        let menu_bar = menu_bar!(
-            (text("File").size(14), file_menu),
-            (text("Image").size(14), image_menu)
-        )
-        .width(Length::Fill)
-        .spacing(20);
-
-        let body = container(match &self.file_system {
-            Some(file_system) => FileExplorerWidget::new()
-                .view(file_system)
-                .map(ApplicationMessage::FileExplorer),
-            None => text("Please open or create image")
-                .align_y(Alignment::Center)
-                .align_x(Alignment::Center)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .into(),
-        });
-
-        let content = Column::new()
-            .padding(8)
-            .spacing(10)
-            .push(menu_bar)
-            .push(body);
-
-        let layout: Element<'_, ApplicationMessage> = container(content)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into();
-
-        if let Some(modal) = &self.active_modal {
-            let modal_content = modal::open(modal);
-            stack![layout, modal_content].into()
-        } else {
-            layout
-        }
-    }
-
-    fn subscription(&self) -> Subscription<ApplicationMessage> {
-        event::listen().map(ApplicationMessage::EventOccurred)
-    }
-
-    fn show_error(&mut self, error: Error) -> Task<ApplicationMessage> {
-        Task::done(ApplicationMessage::OpenModal(Modal::Error(
-            modal::error::Modal::new(error),
-        )))
-    }
-
-    fn theme(&self) -> Theme {
-        if self.theme.is_none() {
-            Theme::Dark
-        } else {
-            self.theme.clone().unwrap()
-        }
-    }
-
-    fn unmount_image(&mut self) -> Option<Task<ApplicationMessage>> {
-        if let Some(file_system) = self.file_system.take() {
-            if let Err(error) = file_system.unmount() {
-                return Some(self.show_error(Error::FileSystemUnmountFailed(error.to_string())));
-            }
-        }
-
-        None
+        component::application_content(theme)
+            .child(
+                TitleBar::new().child(
+                    component::title_item(
+                        component::button("file")
+                            .label("File")
+                            .text_color(theme.foreground)
+                            .dropdown_menu(|menu, _, _| {
+                                menu.menu("Open image", Box::new(OpenImage))
+                                    .menu("Create image", Box::new(CreateImage))
+                                    .separator()
+                                    .menu("Quit", Box::new(Quit))
+                            }),
+                    )
+                    .child(component::title_item(
+                        component::button("image")
+                            .label("Image")
+                            .text_color(theme.foreground)
+                            .dropdown_menu(|menu, _, _| {
+                                menu.menu("Create file", Box::new(CreateFile))
+                                    .menu("Add file", Box::new(AddFile))
+                            }),
+                    ))
+                    .bg(theme.title_bar),
+                ),
+            )
+            .on_action::<Quit>(|_, _, context| context.quit())
     }
 }
+
+fn main() {
+    let application = application().with_assets(gpui_kit::assets::Assets);
+
+    application.run(|context| {
+        gpui_kit::init(context);
+
+        let preference = AccessibilityPreferences::from_system();
+        if let Ok((theme, resolved)) = from_preset("one-dark", true, &preference) {
+            apply(theme, &resolved, &preference, context);
+        }
+
+        let mut window_options = WindowOptions::default();
+
+        let mut title_bar_options = TitlebarOptions::default();
+        title_bar_options.title = Some(SharedString::from("img"));
+        title_bar_options.appears_transparent = true;
+
+        window_options.titlebar = Some(title_bar_options);
+
+        gpui_kit::open_window(window_options, context, |window, context| {
+            context.new(|_| Application)
+        })
+        .expect("Failed to open window");
+    });
+}
+
+actions!(application, [Quit]);
+actions!(image, [CreateImage, OpenImage, AddFile, CreateFile]);
