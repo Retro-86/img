@@ -1,7 +1,7 @@
 pub mod component;
 pub mod dialog;
+pub mod file_system;
 
-use std::collections::binary_heap::Iter;
 use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::{ActiveTheme, GlobalState, TitleBar};
 use gpui_kit::{
@@ -81,7 +81,6 @@ fn main() {
         #[cfg(not(target_os = "macos"))]
         GlobalState::global_mut(context)
             .set_app_menus(menus.into_iter().map(Menu::owned).collect());
-
 
         let mut window_options = TitleBar::window_options();
 

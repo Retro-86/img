@@ -6,4 +6,6 @@ edition = "2024"
 [dependencies]
 gpui-kit = "0.8.1"
 native-theme-gpui = "0.7.0"
-regex = "1.13.1"
+fatfs = "0.3"
+fscommon = "0.1"
+rfd = "0.17.2"
