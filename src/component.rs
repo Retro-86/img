@@ -3,7 +3,7 @@ use gpui_kit::base::v_flex;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::label::Label;
-use gpui_kit::component::menu::{AppMenuBar, DropdownMenu};
+use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme, Theme, TitleBar};
 use gpui_kit::{
@@ -11,8 +11,6 @@ use gpui_kit::{
     Subscription, Window, div, px, transparent_black,
 };
 use std::range::RangeInclusive;
-
-use crate::{AddFile, CreateFile, CreateImage, OpenImage, Quit};
 
 pub fn button(id: impl Into<ElementId>) -> Button {
     Button::new(id)

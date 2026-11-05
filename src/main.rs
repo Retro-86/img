@@ -1,12 +1,12 @@
 pub mod component;
 pub mod dialog;
 
-use gpui_kit::component::ActiveTheme;
+use std::collections::binary_heap::Iter;
 use gpui_kit::component::menu::AppMenuBar;
+use gpui_kit::component::{ActiveTheme, GlobalState, TitleBar};
 use gpui_kit::{
     AppContext, Context, Entity, FocusHandle, InteractiveElement, IntoElement, Menu, MenuItem,
-    ParentElement, Render, SharedString, TitlebarOptions, Window, WindowOptions, actions,
-    application,
+    ParentElement, Render, Window, actions, application,
 };
 use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
 
@@ -54,7 +54,7 @@ fn main() {
             apply(theme, &resolved, &preference, context);
         }
 
-        context.set_menus(vec![
+        let menus = vec![
             Menu {
                 name: "File".into(),
                 items: vec![
@@ -73,15 +73,22 @@ fn main() {
                 ],
                 disabled: false,
             },
-        ]);
+        ];
 
-        let mut window_options = WindowOptions::default();
+        #[cfg(target_os = "macos")]
+        context.set_menus(menus);
 
-        let mut title_bar_options = TitlebarOptions::default();
-        title_bar_options.title = Some(SharedString::from("img"));
-        title_bar_options.appears_transparent = true;
+        #[cfg(not(target_os = "macos"))]
+        GlobalState::global_mut(context)
+            .set_app_menus(menus.into_iter().map(Menu::owned).collect());
 
-        window_options.titlebar = Some(title_bar_options);
+
+        let mut window_options = TitleBar::window_options();
+
+        if let Some(title_bar) = window_options.titlebar.as_mut() {
+            title_bar.title = Some("img".into());
+            title_bar.appears_transparent = true;
+        }
 
         gpui_kit::open_window(window_options, context, |window, context| {
             context.new(|context| Application::new(window, context))
