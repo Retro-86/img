@@ -57,5 +57,5 @@ pub fn title_bar(context: &mut App, menu_bar: &Entity<AppMenuBar>) -> TitleBar {
 }
 
 pub fn path_picker(context: &mut App, window: &mut Window, label: &str) -> Entity<PathPicker> {
-    context.new(|context| PathPicker::new(context, window, label))
+    context.new(|context| PathPicker::new(window, context, label))
 }

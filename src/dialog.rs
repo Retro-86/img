@@ -1,19 +1,22 @@
-use crate::component;
+use crate::{component, event, file_system};
 use gpui_kit::base::v_flex;
+use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{
     WindowExt,
     button::{Button, ButtonVariants},
     dialog::{DialogEntrance, DialogFooter},
 };
 use gpui_kit::{
-    App, AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, Window,
+    App, AppContext, ClickEvent, Context, Entity, EventEmitter, IntoElement, ParentElement, Render,
+    Styled, Window,
 };
+use std::path::PathBuf;
 use std::range::RangeInclusive;
 
 pub struct CreateImageDialog {
     file_name_input: Entity<component::FileNameInput>,
     size_select: Entity<component::SizeSelect>,
-    path_picker: Entity<component::PathPicker>
+    path_picker: Entity<component::PathPicker>,
 }
 
 impl CreateImageDialog {
@@ -28,7 +31,7 @@ impl CreateImageDialog {
         Self {
             file_name_input,
             size_select,
-            path_picker
+            path_picker,
         }
     }
 
@@ -42,10 +45,40 @@ impl CreateImageDialog {
                 .entrance(DialogEntrance::Fade)
         });
     }
+
+    fn submit(&mut self, _event: &ClickEvent, window: &mut Window, context: &mut Context<Self>) {
+        let image_name = self.file_name_input.read(context).value(context) + ".img";
+        let image_file_path_string = self.path_picker.read(context).value(context);
+
+        let image_path = PathBuf::from(image_file_path_string).join(image_name);
+
+        let image_size = self.size_select.read(context).value() * 1_048_576;
+
+        let image_file_system =
+            file_system::create_image(&image_path, image_size as u64, *b"EMULATED_FS");
+
+        match image_file_system {
+            Ok(file_system) => {
+                let event = event::ImageCreatedEvent(file_system);
+                context.emit(event);
+            }
+            Err(error) => {
+                window.push_notification(
+                    (
+                        NotificationType::Error,
+                        format!("Failed to create image file. Please try again.\n{error}"),
+                    ),
+                    context,
+                );
+            }
+        }
+
+        window.close_dialog(context);
+    }
 }
 
 impl Render for CreateImageDialog {
-    fn render(&mut self, _window: &mut Window, _context: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, context: &mut Context<Self>) -> impl IntoElement {
         v_flex()
             .gap_6()
             .child(self.file_name_input.clone())
@@ -57,7 +90,7 @@ impl Render for CreateImageDialog {
                         Button::new("ok")
                             .primary()
                             .label("Submit")
-                            .on_click(|_, _, _| todo!()),
+                            .on_click(context.listener(Self::submit)),
                     )
                     .child(
                         Button::new("cancel")
@@ -69,3 +102,5 @@ impl Render for CreateImageDialog {
             )
     }
 }
+
+impl EventEmitter<event::ImageCreatedEvent> for CreateImageDialog {}

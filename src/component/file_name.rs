@@ -4,7 +4,9 @@ use gpui_kit::component::input::{
     InputGroup, InputGroupAddon, InputGroupAddonAlignment, InputGroupInput, InputGroupText,
 };
 use gpui_kit::component::label::Label;
-use gpui_kit::{AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, Window};
+use gpui_kit::{
+    App, AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, Window,
+};
 
 pub struct FileNameInput {
     state: Entity<InputBaseState<InputMode>>,
@@ -20,8 +22,11 @@ impl FileNameInput {
         extension: &str,
         placeholder: &str,
     ) -> Self {
-        let state =
-            context.new(|context| InputState::new(window, context).placeholder(placeholder));
+        let state = context.new(|context| {
+            InputState::new(window, context)
+                .default_value(placeholder)
+                .placeholder(placeholder)
+        });
 
         Self {
             state,
@@ -33,11 +38,15 @@ impl FileNameInput {
     pub fn state(&self) -> &Entity<InputBaseState<InputMode>> {
         &self.state
     }
+
+    pub fn value(&self, context: &App) -> String {
+        self.state.read(context).value().to_string()
+    }
 }
 
 impl Render for FileNameInput {
     fn render(&mut self, _window: &mut Window, context: &mut Context<Self>) -> impl IntoElement {
-        let value = self.state.read(context).value();
+        let value = self.value(context);
         let count = value.chars().count();
 
         v_flex().gap_2().child(Label::new(&self.label)).child(

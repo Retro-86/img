@@ -1,7 +1,11 @@
 pub mod component;
 pub mod dialog;
 pub mod file_system;
+pub mod event;
 
+use std::fs::File;
+use fatfs::FileSystem;
+use fscommon::BufStream;
 use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::{ActiveTheme, GlobalState, TitleBar};
 use gpui_kit::{
@@ -13,6 +17,7 @@ use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
 pub struct Application {
     menu_bar: Entity<AppMenuBar>,
     focus_handle: FocusHandle,
+    file_system: Option<FileSystem<BufStream<File>>>,
 }
 
 impl Application {
@@ -23,6 +28,7 @@ impl Application {
         Self {
             menu_bar: AppMenuBar::new(context),
             focus_handle,
+            file_system: None,
         }
     }
 }

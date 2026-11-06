@@ -1,13 +1,15 @@
-use std::range::RangeInclusive;
 use gpui_kit::base::slider::{SliderEvent, SliderState};
-use gpui_kit::{AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, Subscription, Window};
 use gpui_kit::base::v_flex;
 use gpui_kit::component::label::Label;
 use gpui_kit::component::slider::Slider;
+use gpui_kit::{
+    AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, Subscription, Window,
+};
+use std::range::RangeInclusive;
 
 pub struct SizeSelect {
     state: Entity<SliderState>,
-    subscription: Subscription,
+    _subscription: Subscription,
     value: u32,
 }
 
@@ -21,22 +23,27 @@ impl SizeSelect {
                 .step(step as f32)
         });
 
-        let subscription = context.subscribe(
-            &state,
-            |this, _, event: &SliderEvent, context| match event {
-                SliderEvent::Change(value) => {
-                    this.value = value.start() as u32;
-                    context.notify()
-                }
-                _ => {}
-            },
-        );
+        let subscription =
+            context.subscribe(
+                &state,
+                |this, _, event: &SliderEvent, context| match event {
+                    SliderEvent::Change(value) => {
+                        this.value = value.start() as u32;
+                        context.notify()
+                    }
+                    _ => {}
+                },
+            );
 
         Self {
             state,
-            subscription,
+            _subscription: subscription,
             value: 16,
         }
+    }
+
+    pub fn value(&self) -> u32 {
+        self.value
     }
 }
 
