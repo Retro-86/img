@@ -1,20 +1,21 @@
-pub mod file_name;
+pub mod file_name_input;
 pub mod file_tree;
 pub mod path_picker;
 pub mod size_select;
 
-pub use crate::component::file_name::FileNameInput;
-use crate::component::file_tree::FileTree;
+pub use crate::component::file_name_input::FileNameInput;
+pub use crate::component::file_tree::FileTree;
 pub use crate::component::path_picker::PathPicker;
 pub use crate::component::size_select::SizeSelect;
 use fatfs::FileSystem;
 use fscommon::BufStream;
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::dialog::DialogFooter;
 use gpui_kit::component::menu::AppMenuBar;
-use gpui_kit::component::{ActiveTheme, Theme, TitleBar};
+use gpui_kit::component::{ActiveTheme, Theme, TitleBar, WindowExt};
 use gpui_kit::{
-    App, AppContext, Div, ElementId, Entity, IntoElement, ParentElement, Styled, Window, div, px,
-    transparent_black,
+    App, AppContext, ClickEvent, Context, Div, ElementId, Entity, IntoElement, ParentElement,
+    Styled, Window, div, px, transparent_black,
 };
 use std::fs::File;
 use std::range::RangeInclusive;
@@ -43,13 +44,13 @@ pub fn title_items(children: Vec<impl IntoElement>) -> Div {
 }
 
 pub fn file_name_input(
-    context: &mut App,
     window: &mut Window,
+    context: &mut App,
     label: &str,
     extension: &str,
     placeholder: &str,
 ) -> Entity<FileNameInput> {
-    context.new(|context| FileNameInput::new(context, window, label, extension, placeholder))
+    context.new(|context| FileNameInput::new(window, context, label, extension, placeholder))
 }
 
 pub fn size_select(context: &mut App, range: RangeInclusive<u32>, step: u32) -> Entity<SizeSelect> {
@@ -62,13 +63,37 @@ pub fn title_bar(context: &mut App, menu_bar: &Entity<AppMenuBar>) -> TitleBar {
     TitleBar::new().child(menu_bar.clone()).bg(theme.title_bar)
 }
 
-pub fn path_picker(context: &mut App, window: &mut Window, label: &str) -> Entity<PathPicker> {
-    context.new(|context| PathPicker::new(window, context, label))
-}
-
 pub fn file_tree(
     context: &mut App,
     file_system: Arc<FileSystem<BufStream<File>>>,
 ) -> Entity<FileTree> {
     context.new(|context| FileTree::new(context, file_system))
+}
+
+pub fn dialog_footer<T: 'static>(
+    context: &mut Context<T>,
+    submit: impl Fn(&mut T, &ClickEvent, &mut Window, &mut Context<T>) + 'static,
+) -> DialogFooter {
+    DialogFooter::new()
+        .child(
+            Button::new("ok")
+                .primary()
+                .label("Submit")
+                .on_click(context.listener(submit)),
+        )
+        .child(
+            Button::new("cancel")
+                .label("Cancel")
+                .on_click(|_, window, context| {
+                    window.close_dialog(context);
+                }),
+        )
+}
+
+pub fn folder_picker(window: &mut Window, context: &mut App, label: &str) -> Entity<PathPicker> {
+    context.new(|context| PathPicker::folder(window, context, label))
+}
+
+pub fn file_picker(window: &mut Window, context: &mut App, label: &str) -> Entity<PathPicker> {
+    context.new(|context| PathPicker::file(window, context, label))
 }

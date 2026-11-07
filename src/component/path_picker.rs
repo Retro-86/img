@@ -10,35 +10,60 @@ use gpui_kit::{
     App, AppContext, ClickEvent, Context, Entity, IntoElement, ParentElement, Render, SharedString,
     Styled, Window,
 };
+use std::path::Path;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PickerMode {
+    File,
+    Folder,
+}
 
 pub struct PathPicker {
     state: Entity<InputBaseState<InputMode>>,
     label: SharedString,
+    mode: PickerMode,
 }
 
 impl PathPicker {
-    pub fn new(window: &mut Window, context: &mut Context<Self>, label: &str) -> Self {
+    pub fn new(
+        window: &mut Window,
+        context: &mut Context<Self>,
+        label: &str,
+        mode: PickerMode,
+    ) -> Self {
         let state = context.new(|context| InputState::new(window, context));
 
         Self {
             state,
             label: SharedString::from(label),
+            mode,
         }
     }
 
-    fn select_folder(
-        &mut self,
-        _event: &ClickEvent,
-        window: &mut Window,
-        context: &mut Context<Self>,
-    ) {
+    pub fn file(window: &mut Window, context: &mut Context<Self>, label: &str) -> Self {
+        Self::new(window, context, label, PickerMode::File)
+    }
+
+    pub fn folder(window: &mut Window, context: &mut Context<Self>, label: &str) -> Self {
+        Self::new(window, context, label, PickerMode::Folder)
+    }
+
+    fn select(&mut self, _event: &ClickEvent, window: &mut Window, context: &mut Context<Self>) {
+        let mode = self.mode;
+
         context
             .spawn_in(window, async move |this, context| {
-                let Some(selected_path) = rfd::AsyncFileDialog::new().pick_folder().await else {
+                let dialog = rfd::AsyncFileDialog::new();
+                let selected = match mode {
+                    PickerMode::File => dialog.pick_file().await,
+                    PickerMode::Folder => dialog.pick_folder().await,
+                };
+
+                let Some(selected) = selected else {
                     return;
                 };
 
-                let value = SharedString::from(selected_path.path().to_string_lossy().to_string());
+                let value = path_to_shared_string(selected.path());
 
                 this.update_in(context, |this, window, context| {
                     this.state.update(context, |state, context| {
@@ -76,9 +101,13 @@ impl Render for PathPicker {
                                     .rounded_lg()
                                     .rounded_l_none()
                                     .icon(IconName::Folder)
-                                    .on_click(context.listener(Self::select_folder)),
+                                    .on_click(context.listener(Self::select)),
                             ),
                     ),
             )
     }
+}
+
+fn path_to_shared_string(path: &Path) -> SharedString {
+    SharedString::from(path.to_string_lossy().to_string())
 }

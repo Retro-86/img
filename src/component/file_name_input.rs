@@ -16,8 +16,8 @@ pub struct FileNameInput {
 
 impl FileNameInput {
     pub fn new(
-        context: &mut Context<Self>,
         window: &mut Window,
+        context: &mut Context<Self>,
         label: &str,
         extension: &str,
         placeholder: &str,

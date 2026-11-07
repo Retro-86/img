@@ -3,15 +3,16 @@ pub mod dialog;
 pub mod event;
 pub mod file_system;
 
+use crate::dialog::image::ImageDialog;
 use fatfs::FileSystem;
 use fscommon::BufStream;
 use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::{ActiveTheme, TitleBar};
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::{
-    AppContext, Bounds, Context, Entity, FocusHandle, Global, InteractiveElement, IntoElement,
-    Menu, MenuItem, ParentElement, Render, Window, WindowBounds, actions, application, point, px,
-    size,
+    AppContext, Bounds, Context, Entity, FocusHandle, Focusable, Global, InteractiveElement,
+    IntoElement, Menu, MenuItem, ParentElement, Render, Window, WindowBounds, actions, application,
+    point, px, size,
 };
 use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
 use std::fs::File;
@@ -20,7 +21,7 @@ use std::sync::Arc;
 pub struct Application {
     menu_bar: Entity<AppMenuBar>,
     focus_handle: FocusHandle,
-    file_system: Option<Arc<FileSystem<BufStream<File>>>>,
+    file_tree: Option<Entity<component::FileTree>>,
 }
 
 impl Application {
@@ -31,8 +32,22 @@ impl Application {
         Self {
             menu_bar: AppMenuBar::new(context),
             focus_handle,
-            file_system: None,
+            file_tree: None,
         }
+    }
+
+    pub fn set_file_system(
+        &mut self,
+        context: &mut Context<Self>,
+        file_system: Arc<FileSystem<BufStream<File>>>,
+    ) {
+        self.file_tree = Some(component::file_tree(context, file_system));
+    }
+}
+
+impl Focusable for Application {
+    fn focus_handle(&self, _context: &gpui_kit::App) -> FocusHandle {
+        self.focus_handle.clone()
     }
 }
 
@@ -43,16 +58,22 @@ impl Render for Application {
         component::application_content(theme)
             .track_focus(&self.focus_handle)
             .child(component::title_bar(context, &self.menu_bar))
-            .when_some(self.file_system.as_ref(), |this, file_system| {
-                this.child(component::file_tree(context, file_system.clone()))
+            .when_some(self.file_tree.as_ref(), |this, file_tree| {
+                this.child(file_tree.clone())
             })
             .on_action(context.listener(|_, _: &CreateImage, window, context| {
                 dialog::CreateImageDialog::open(window, context);
             }))
+            .on_action(context.listener(|_, _: &OpenImage, window, context| {
+                dialog::OpenImageDialog::open(window, context);
+            }))
+            .on_action(context.listener(|this, _: &CloseImage, window, context| {
+                this.file_tree = None;
+                window.focus(&this.focus_handle, context);
+            }))
             .on_action(context.listener(|_, _: &Quit, _, context| {
                 context.quit();
             }))
-            .on_action(context.listener(|this, _: &CloseImage, _, _| this.file_system = None))
     }
 }
 
@@ -122,14 +143,5 @@ fn main() {
 
 impl Global for Application {}
 
-actions!(
-    application,
-    [
-        Quit,
-        CreateImage,
-        OpenImage,
-        AddFile,
-        CreateFile,
-        CloseImage
-    ]
-);
+actions!(application, [Quit, CreateImage, OpenImage, CloseImage]);
+actions!(image, [AddFile, CreateFile]);
