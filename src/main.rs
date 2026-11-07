@@ -88,7 +88,9 @@ impl Render for Application {
             .on_action(context.listener(|this, _: &CloseImage, window, context| {
                 this.file_system = None;
                 this.file_tree_state = None;
+
                 window.focus(&this.focus_handle, context);
+                context.notify();
             }))
             .on_action(context.listener(|_, _: &Quit, _, context| {
                 context.quit();
