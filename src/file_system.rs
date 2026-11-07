@@ -1,9 +1,9 @@
 use fatfs::{Dir, FatType, FileSystem, ReadWriteSeek};
 use fscommon::BufStream;
+use gpui_kit::base::TreeItem;
 use std::fs::File;
 use std::path::Path;
 use std::{fs, io};
-use gpui_kit::base::TreeItem;
 
 pub fn read_directory<T: ReadWriteSeek>(
     directory: &Dir<T>,
@@ -50,24 +50,15 @@ pub fn read_directory<T: ReadWriteSeek>(
     Ok(items)
 }
 
-
 pub fn create_image(
     path: &Path,
     size: u64,
     volume_label: [u8; 11],
 ) -> Result<FileSystem<BufStream<File>>, io::Error> {
-    if fs::exists(path)? {
-        return Err(io::Error::new(
-            io::ErrorKind::AlreadyExists,
-            "Image file already exists",
-        ));
-    }
-
     let image_file = fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .create(true)
-        .truncate(false)
+        .create_new(true)
         .open(path)?;
 
     image_file.set_len(size)?;

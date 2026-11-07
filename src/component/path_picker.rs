@@ -66,13 +66,17 @@ impl PathPicker {
                 let value = path_to_shared_string(selected.path());
 
                 this.update_in(context, |this, window, context| {
-                    this.state.update(context, |state, context| {
-                        state.set_value(value, window, context);
-                    });
+                    this.set_value(value, window, context);
                 })
                 .unwrap();
             })
             .detach();
+    }
+
+    fn set_value(&mut self, value: SharedString, window: &mut Window, context: &mut Context<Self>) {
+        self.state.update(context, |state, context| {
+            state.set_value(value, window, context);
+        });
     }
 
     pub fn value(&self, context: &App) -> String {
