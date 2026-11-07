@@ -1,18 +1,18 @@
 pub mod component;
 pub mod dialog;
-pub mod file_system;
 pub mod event;
+pub mod file_system;
 
-use std::fs::File;
 use fatfs::FileSystem;
 use fscommon::BufStream;
 use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::{ActiveTheme, GlobalState, TitleBar};
 use gpui_kit::{
-    AppContext, Context, Entity, FocusHandle, InteractiveElement, IntoElement, Menu, MenuItem,
-    ParentElement, Render, Window, actions, application,
+    AppContext, Bounds, Context, Entity, FocusHandle, InteractiveElement, IntoElement, Menu,
+    MenuItem, ParentElement, Render, Window, WindowBounds, actions, application, point, px, size,
 };
 use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
+use std::fs::File;
 
 pub struct Application {
     menu_bar: Entity<AppMenuBar>,
@@ -94,6 +94,11 @@ fn main() {
             title_bar.title = Some("img".into());
             title_bar.appears_transparent = true;
         }
+
+        window_options.window_bounds = Some(WindowBounds::Windowed(Bounds {
+            origin: point(px(100.0), px(100.0)),
+            size: size(px(600.0), px(750.0)),
+        }));
 
         gpui_kit::open_window(window_options, context, |window, context| {
             context.new(|context| Application::new(window, context))
