@@ -18,6 +18,7 @@ use gpui_kit::{
 };
 use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
 use std::fs::File;
+use std::io;
 
 pub struct Application {
     menu_bar: Entity<AppMenuBar>,
@@ -39,24 +40,24 @@ impl Application {
         }
     }
 
-    pub fn set_file_system(&mut self, file_system: FileSystem<BufStream<File>>) {
-        self.file_system = Some(file_system);
-    }
-
-    pub fn populate_file_state(&mut self, context: &mut Context<Self>) -> std::io::Result<()> {
-        let Some(file_system) = &self.file_system else {
-            return Ok(());
-        };
-
+    pub fn set_file_system(
+        &mut self,
+        context: &mut Context<Self>,
+        file_system: FileSystem<BufStream<File>>,
+    ) -> io::Result<()> {
         let items = file_system::read_directory(&file_system.root_dir(), "")?;
 
-        let tree_state = self
-            .file_tree_state
-            .get_or_insert_with(|| context.new(|context| TreeState::new(context)));
-
-        tree_state.update(context, |state, context| {
+        let tree_state = context.new(|context| {
+            let mut state = TreeState::new(context);
             state.set_items(items, context);
+
+            state
         });
+
+        self.file_system = Some(file_system);
+        self.file_tree_state = Some(tree_state);
+
+        context.notify();
 
         Ok(())
     }

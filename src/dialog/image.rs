@@ -28,9 +28,7 @@ pub trait ImageDialog: Render + EventEmitter<event::ImageOpenEvent> + Sized + 's
                 window,
                 |application, _view, event: &event::ImageOpenEvent, window, context| {
                     if let Some(file_system) = event.0.borrow_mut().take() {
-                        application.set_file_system(file_system);
-
-                        if let Err(error) = application.populate_file_state(context) {
+                        if let Err(error) = application.set_file_system(context, file_system) {
                             window.push_notification(
                                 (
                                     NotificationType::Error,
