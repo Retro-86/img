@@ -1,4 +1,3 @@
-use crate::event::ImageCreatedEvent;
 use crate::{Application, component, event, file_system};
 use gpui_kit::base::v_flex;
 use gpui_kit::component::notification::NotificationType;
@@ -14,6 +13,7 @@ use gpui_kit::{
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::range::RangeInclusive;
+use std::sync::Arc;
 
 pub struct CreateImageDialog {
     file_name_input: Entity<component::FileNameInput>,
@@ -41,11 +41,14 @@ impl CreateImageDialog {
         let view = context.new(|context| Self::new(window, context));
 
         context
-            .subscribe(&view, |application, _view, event: &ImageCreatedEvent, _| {
-                if let Some(file_system) = event.0.borrow_mut().take() {
-                    application.file_system = Some(file_system);
-                }
-            })
+            .subscribe(
+                &view,
+                |application, _view, event: &event::ImageCreatedEvent, _| {
+                    if let Some(file_system) = event.0.borrow_mut().take() {
+                        application.file_system = Some(Arc::new(file_system));
+                    }
+                },
+            )
             .detach();
 
         window.open_dialog(context, move |dialog, _, _| {

@@ -1,10 +1,14 @@
 pub mod file_name;
+pub mod file_tree;
 pub mod path_picker;
 pub mod size_select;
 
 pub use crate::component::file_name::FileNameInput;
+use crate::component::file_tree::FileTree;
 pub use crate::component::path_picker::PathPicker;
 pub use crate::component::size_select::SizeSelect;
+use fatfs::FileSystem;
+use fscommon::BufStream;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::{ActiveTheme, Theme, TitleBar};
@@ -12,7 +16,9 @@ use gpui_kit::{
     App, AppContext, Div, ElementId, Entity, IntoElement, ParentElement, Styled, Window, div, px,
     transparent_black,
 };
+use std::fs::File;
 use std::range::RangeInclusive;
+use std::sync::Arc;
 
 pub fn button(id: impl Into<ElementId>) -> Button {
     Button::new(id)
@@ -58,4 +64,11 @@ pub fn title_bar(context: &mut App, menu_bar: &Entity<AppMenuBar>) -> TitleBar {
 
 pub fn path_picker(context: &mut App, window: &mut Window, label: &str) -> Entity<PathPicker> {
     context.new(|context| PathPicker::new(window, context, label))
+}
+
+pub fn file_tree(
+    context: &mut App,
+    file_system: Arc<FileSystem<BufStream<File>>>,
+) -> Entity<FileTree> {
+    context.new(|context| FileTree::new(context, file_system))
 }

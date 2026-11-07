@@ -7,6 +7,7 @@ use fatfs::FileSystem;
 use fscommon::BufStream;
 use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::{ActiveTheme, TitleBar};
+use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::{
     AppContext, Bounds, Context, Entity, FocusHandle, Global, InteractiveElement, IntoElement,
     Menu, MenuItem, ParentElement, Render, Window, WindowBounds, actions, application, point, px,
@@ -14,11 +15,12 @@ use gpui_kit::{
 };
 use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
 use std::fs::File;
+use std::sync::Arc;
 
 pub struct Application {
     menu_bar: Entity<AppMenuBar>,
     focus_handle: FocusHandle,
-    file_system: Option<FileSystem<BufStream<File>>>,
+    file_system: Option<Arc<FileSystem<BufStream<File>>>>,
 }
 
 impl Application {
@@ -41,12 +43,16 @@ impl Render for Application {
         component::application_content(theme)
             .track_focus(&self.focus_handle)
             .child(component::title_bar(context, &self.menu_bar))
+            .when_some(self.file_system.as_ref(), |this, file_system| {
+                this.child(component::file_tree(context, file_system.clone()))
+            })
             .on_action(context.listener(|_, _: &CreateImage, window, context| {
                 dialog::CreateImageDialog::open(window, context);
             }))
             .on_action(context.listener(|_, _: &Quit, _, context| {
                 context.quit();
             }))
+            .on_action(context.listener(|this, _: &CloseImage, _, _| this.file_system = None))
     }
 }
 
@@ -67,6 +73,7 @@ fn main() {
                 items: vec![
                     MenuItem::action("Open image", OpenImage),
                     MenuItem::action("Create image", CreateImage),
+                    MenuItem::action("Close image", CloseImage),
                     MenuItem::separator(),
                     MenuItem::action("Quit", Quit),
                 ],
@@ -117,5 +124,12 @@ impl Global for Application {}
 
 actions!(
     application,
-    [Quit, CreateImage, OpenImage, AddFile, CreateFile]
+    [
+        Quit,
+        CreateImage,
+        OpenImage,
+        AddFile,
+        CreateFile,
+        CloseImage
+    ]
 );
