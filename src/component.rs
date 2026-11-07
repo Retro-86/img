@@ -7,8 +7,7 @@ pub use crate::component::file_name_input::FileNameInput;
 pub use crate::component::file_tree::FileTree;
 pub use crate::component::path_picker::PathPicker;
 pub use crate::component::size_select::SizeSelect;
-use fatfs::FileSystem;
-use fscommon::BufStream;
+use gpui_kit::base::TreeState;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::dialog::DialogFooter;
 use gpui_kit::component::menu::AppMenuBar;
@@ -17,9 +16,7 @@ use gpui_kit::{
     App, AppContext, ClickEvent, Context, Div, ElementId, Entity, IntoElement, ParentElement,
     Styled, Window, div, px, transparent_black,
 };
-use std::fs::File;
 use std::range::RangeInclusive;
-use std::sync::Arc;
 
 pub fn button(id: impl Into<ElementId>) -> Button {
     Button::new(id)
@@ -63,11 +60,8 @@ pub fn title_bar(context: &mut App, menu_bar: &Entity<AppMenuBar>) -> TitleBar {
     TitleBar::new().child(menu_bar.clone()).bg(theme.title_bar)
 }
 
-pub fn file_tree(
-    context: &mut App,
-    file_system: Arc<FileSystem<BufStream<File>>>,
-) -> Entity<FileTree> {
-    context.new(|context| FileTree::new(context, file_system))
+pub fn file_tree(state: Entity<TreeState>) -> FileTree {
+    FileTree::new(state)
 }
 
 pub fn dialog_footer<T: 'static>(

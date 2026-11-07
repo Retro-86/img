@@ -13,7 +13,6 @@ use std::cell::RefCell;
 use std::fs::File;
 use std::path::PathBuf;
 use std::range::RangeInclusive;
-use std::sync::Arc;
 
 pub trait ImageDialog: Render + EventEmitter<event::ImageOpenEvent> + Sized + 'static {
     const TITLE: &'static str;
@@ -24,11 +23,22 @@ pub trait ImageDialog: Render + EventEmitter<event::ImageOpenEvent> + Sized + 's
         let view = context.new(|context| Self::new(window, context));
 
         context
-            .subscribe(
+            .subscribe_in(
                 &view,
-                |application, _view, event: &event::ImageOpenEvent, context| {
+                window,
+                |application, _view, event: &event::ImageOpenEvent, window, context| {
                     if let Some(file_system) = event.0.borrow_mut().take() {
-                        application.set_file_system(context, Arc::new(file_system));
+                        application.set_file_system(file_system);
+
+                        if let Err(error) = application.populate_file_state(context) {
+                            window.push_notification(
+                                (
+                                    NotificationType::Error,
+                                    format!("Unable to read the image contents\n{error}"),
+                                ),
+                                context,
+                            );
+                        }
                     }
                 },
             )
@@ -49,9 +59,7 @@ pub trait ImageDialog: Render + EventEmitter<event::ImageOpenEvent> + Sized + 's
         context: &mut Context<Self>,
     ) {
         match result {
-            Ok(file_system) => {
-                context.emit(event::ImageOpenEvent(RefCell::new(Some(file_system))));
-            }
+            Ok(file_system) => context.emit(event::ImageOpenEvent(RefCell::new(Some(file_system)))),
             Err(error) => {
                 window.push_notification(
                     (NotificationType::Error, format!("{error_prefix}\n{error}")),

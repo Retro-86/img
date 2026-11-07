@@ -1,15 +1,68 @@
-use fatfs::{FatType, FileSystem};
+use fatfs::{Dir, FatType, FileSystem, ReadWriteSeek};
 use fscommon::BufStream;
 use std::fs::File;
-use std::io::{Error, copy};
 use std::path::Path;
 use std::{fs, io};
+use gpui_kit::base::TreeItem;
+
+pub fn read_directory<T: ReadWriteSeek>(
+    directory: &Dir<T>,
+    current_path: &str,
+) -> io::Result<Vec<TreeItem>> {
+    let mut items = Vec::new();
+
+    for entry in directory.iter() {
+        let entry = entry.map_err(|error| {
+            let path = if current_path.is_empty() {
+                "/"
+            } else {
+                current_path
+            };
+
+            io::Error::new(
+                error.kind(),
+                format!("Unable to read the catalog {path}\n {error}"),
+            )
+        })?;
+
+        let name = entry.file_name();
+
+        if name == "." || name == ".." {
+            continue;
+        }
+
+        let full_path = if current_path.is_empty() {
+            name.clone()
+        } else {
+            format!("{}/{}", current_path, name)
+        };
+
+        let mut tree_item = TreeItem::new(full_path.clone(), name);
+
+        if entry.is_dir() {
+            let children = read_directory(&entry.to_dir(), &full_path)?;
+            tree_item = tree_item.children(children);
+        }
+
+        items.push(tree_item);
+    }
+
+    Ok(items)
+}
+
 
 pub fn create_image(
     path: &Path,
     size: u64,
     volume_label: [u8; 11],
-) -> Result<FileSystem<BufStream<File>>, Error> {
+) -> Result<FileSystem<BufStream<File>>, io::Error> {
+    if fs::exists(path)? {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "Image file already exists",
+        ));
+    }
+
     let image_file = fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -29,7 +82,7 @@ pub fn create_image(
     FileSystem::new(buffered_stream, fatfs::FsOptions::new())
 }
 
-pub fn open_image(path: &Path) -> Result<FileSystem<BufStream<File>>, Error> {
+pub fn open_image(path: &Path) -> Result<FileSystem<BufStream<File>>, io::Error> {
     let image_file = fs::OpenOptions::new().read(true).write(true).open(path)?;
 
     let buffered_stream = BufStream::new(image_file);
@@ -41,8 +94,8 @@ pub fn copy_file_to_image(
     source_file_path: &Path,
     file_system: &mut FileSystem<BufStream<File>>,
     destination_file_path: &str,
-) -> Result<(), Error> {
-    let mut source_file = fs::File::open(source_file_path)?;
+) -> Result<(), io::Error> {
+    let mut source_file = File::open(source_file_path)?;
 
     let root_directory = file_system.root_dir();
     let mut destination_file = root_directory
@@ -51,7 +104,7 @@ pub fn copy_file_to_image(
 
     destination_file.truncate()?;
 
-    copy(&mut source_file, &mut destination_file)?;
+    io::copy(&mut source_file, &mut destination_file)?;
 
     drop(source_file);
     drop(destination_file);

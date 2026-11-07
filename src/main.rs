@@ -3,9 +3,11 @@ pub mod dialog;
 pub mod event;
 pub mod file_system;
 
+use crate::component::FileTree;
 use crate::dialog::image::ImageDialog;
 use fatfs::FileSystem;
 use fscommon::BufStream;
+use gpui_kit::base::TreeState;
 use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::{ActiveTheme, TitleBar};
 use gpui_kit::prelude::FluentBuilder;
@@ -16,12 +18,12 @@ use gpui_kit::{
 };
 use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
 use std::fs::File;
-use std::sync::Arc;
 
 pub struct Application {
     menu_bar: Entity<AppMenuBar>,
     focus_handle: FocusHandle,
-    file_tree: Option<Entity<component::FileTree>>,
+    file_system: Option<FileSystem<BufStream<File>>>,
+    file_tree_state: Option<Entity<TreeState>>,
 }
 
 impl Application {
@@ -32,16 +34,31 @@ impl Application {
         Self {
             menu_bar: AppMenuBar::new(context),
             focus_handle,
-            file_tree: None,
+            file_system: None,
+            file_tree_state: None,
         }
     }
 
-    pub fn set_file_system(
-        &mut self,
-        context: &mut Context<Self>,
-        file_system: Arc<FileSystem<BufStream<File>>>,
-    ) {
-        self.file_tree = Some(component::file_tree(context, file_system));
+    pub fn set_file_system(&mut self, file_system: FileSystem<BufStream<File>>) {
+        self.file_system = Some(file_system);
+    }
+
+    pub fn populate_file_state(&mut self, context: &mut Context<Self>) -> std::io::Result<()> {
+        let Some(file_system) = &self.file_system else {
+            return Ok(());
+        };
+
+        let items = file_system::read_directory(&file_system.root_dir(), "")?;
+
+        let tree_state = self
+            .file_tree_state
+            .get_or_insert_with(|| context.new(|context| TreeState::new(context)));
+
+        tree_state.update(context, |state, context| {
+            state.set_items(items, context);
+        });
+
+        Ok(())
     }
 }
 
@@ -58,8 +75,8 @@ impl Render for Application {
         component::application_content(theme)
             .track_focus(&self.focus_handle)
             .child(component::title_bar(context, &self.menu_bar))
-            .when_some(self.file_tree.as_ref(), |this, file_tree| {
-                this.child(file_tree.clone())
+            .when_some(self.file_tree_state.as_ref(), |this, file_tree_state| {
+                this.child(FileTree::new(file_tree_state.clone()))
             })
             .on_action(context.listener(|_, _: &CreateImage, window, context| {
                 dialog::CreateImageDialog::open(window, context);
@@ -68,7 +85,8 @@ impl Render for Application {
                 dialog::OpenImageDialog::open(window, context);
             }))
             .on_action(context.listener(|this, _: &CloseImage, window, context| {
-                this.file_tree = None;
+                this.file_system = None;
+                this.file_tree_state = None;
                 window.focus(&this.focus_handle, context);
             }))
             .on_action(context.listener(|_, _: &Quit, _, context| {
