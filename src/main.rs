@@ -13,8 +13,8 @@ use gpui_kit::component::{ActiveTheme, TitleBar};
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::{
     AppContext, Bounds, Context, Entity, FocusHandle, Focusable, Global, InteractiveElement,
-    IntoElement, Menu, MenuItem, ParentElement, Render, Window, WindowBounds, actions, application,
-    point, px, size,
+    IntoElement, Menu, MenuItem, ParentElement, Render, Styled, Window, WindowBounds, actions,
+    application, div, point, px, size, text,
 };
 use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
 use std::fs::File;
@@ -78,6 +78,17 @@ impl Render for Application {
             .child(component::title_bar(context, &self.menu_bar))
             .when_some(self.file_tree_state.as_ref(), |this, file_tree_state| {
                 this.child(FileTree::new(file_tree_state.clone()))
+            })
+            .when_none(&self.file_tree_state, |this| {
+                this.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .h_full()
+                        .w_full()
+                        .child(text!("open or create image file")),
+                )
             })
             .on_action(context.listener(|_, _: &CreateImage, window, context| {
                 dialog::CreateImageDialog::open(window, context);
