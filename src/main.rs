@@ -6,10 +6,11 @@ pub mod file_system;
 use fatfs::FileSystem;
 use fscommon::BufStream;
 use gpui_kit::component::menu::AppMenuBar;
-use gpui_kit::component::{ActiveTheme, GlobalState, TitleBar};
+use gpui_kit::component::{ActiveTheme, TitleBar};
 use gpui_kit::{
-    AppContext, Bounds, Context, Entity, FocusHandle, InteractiveElement, IntoElement, Menu,
-    MenuItem, ParentElement, Render, Window, WindowBounds, actions, application, point, px, size,
+    AppContext, Bounds, Context, Entity, FocusHandle, Global, InteractiveElement, IntoElement,
+    Menu, MenuItem, ParentElement, Render, Window, WindowBounds, actions, application, point, px,
+    size,
 };
 use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
 use std::fs::File;
@@ -85,8 +86,11 @@ fn main() {
         context.set_menus(menus);
 
         #[cfg(not(target_os = "macos"))]
-        GlobalState::global_mut(context)
-            .set_app_menus(menus.into_iter().map(Menu::owned).collect());
+        {
+            use gpui_kit::component::GlobalState;
+            GlobalState::global_mut(context)
+                .set_app_menus(menus.into_iter().map(Menu::owned).collect());
+        }
 
         let mut window_options = TitleBar::window_options();
 
@@ -108,6 +112,8 @@ fn main() {
         context.activate(true);
     });
 }
+
+impl Global for Application {}
 
 actions!(
     application,

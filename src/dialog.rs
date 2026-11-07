@@ -1,4 +1,5 @@
-use crate::{component, event, file_system};
+use crate::event::ImageCreatedEvent;
+use crate::{Application, component, event, file_system};
 use gpui_kit::base::v_flex;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{
@@ -7,9 +8,10 @@ use gpui_kit::component::{
     dialog::{DialogEntrance, DialogFooter},
 };
 use gpui_kit::{
-    App, AppContext, ClickEvent, Context, Entity, EventEmitter, IntoElement, ParentElement, Render,
+    AppContext, ClickEvent, Context, Entity, EventEmitter, IntoElement, ParentElement, Render,
     Styled, Window,
 };
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::range::RangeInclusive;
 
@@ -35,8 +37,16 @@ impl CreateImageDialog {
         }
     }
 
-    pub fn open(window: &mut Window, context: &mut App) {
+    pub fn open(window: &mut Window, context: &mut Context<Application>) {
         let view = context.new(|context| Self::new(window, context));
+
+        context
+            .subscribe(&view, |application, _view, event: &ImageCreatedEvent, _| {
+                if let Some(file_system) = event.0.borrow_mut().take() {
+                    application.file_system = Some(file_system);
+                }
+            })
+            .detach();
 
         window.open_dialog(context, move |dialog, _, _| {
             dialog
@@ -59,7 +69,7 @@ impl CreateImageDialog {
 
         match image_file_system {
             Ok(file_system) => {
-                let event = event::ImageCreatedEvent(file_system);
+                let event = event::ImageCreatedEvent(RefCell::new(Some(file_system)));
                 context.emit(event);
             }
             Err(error) => {
