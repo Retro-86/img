@@ -10,13 +10,6 @@ use gpui_kit::{
 use std::fs::File;
 use std::sync::Arc;
 
-#[derive(Clone)]
-pub struct FileTreeItem {
-    pub label: String,
-    pub is_dir: bool,
-    pub path: String,
-}
-
 pub struct FileTree {
     state: Entity<TreeState>,
     file_system: Arc<FileSystem<BufStream<File>>>,
