@@ -1,3 +1,4 @@
+use crate::actions;
 use gpui_kit::assets::IconName;
 use gpui_kit::base::{TreeState, h_flex};
 use gpui_kit::component::list::ListItem;
@@ -33,6 +34,23 @@ impl RenderOnce for FileTree {
                 .selected(selected)
                 .pl(px(16.) * entry.depth() + px(12.))
                 .child(h_flex().gap_2().child(icon).child(item.label.clone()))
+        })
+        .context_menu(|_index, entry, menu, _, _| {
+            let item = entry.item();
+            let file_identifier = &item.id;
+
+            menu.menu(
+                "Rename",
+                Box::new(actions::Rename {
+                    identifier: file_identifier.clone(),
+                }),
+            )
+            .menu(
+                "Delete",
+                Box::new(actions::Delete {
+                    identifier: file_identifier.clone(),
+                }),
+            )
         })
     }
 }

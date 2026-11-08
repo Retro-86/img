@@ -1,5 +1,6 @@
 use crate::dialog::dialog_form;
-use crate::{Application, component, event, file_system};
+use crate::image::Image;
+use crate::{Application, component, event, file_system, image};
 use fatfs::FileSystem;
 use fscommon::BufStream;
 use gpui_kit::component::WindowExt;
@@ -28,14 +29,20 @@ pub trait ImageDialog: Render + EventEmitter<event::ImageOpenEvent> + Sized + 's
                 window,
                 |application, _view, event: &event::ImageOpenEvent, window, context| {
                     if let Some(file_system) = event.0.borrow_mut().take() {
-                        if let Err(error) = application.set_file_system(context, file_system) {
-                            window.push_notification(
-                                (
-                                    NotificationType::Error,
-                                    format!("Unable to read the image contents\n{error}"),
-                                ),
-                                context,
-                            );
+                        match image::create_tree_state(context, &file_system) {
+                            Ok(state) => {
+                                let image = context.new(|_| Image::from(file_system, state));
+                                application.set_image(context, image);
+                            }
+                            Err(error) => {
+                                window.push_notification(
+                                    (
+                                        NotificationType::Error,
+                                        format!("Unable to read the image contents\n{error}"),
+                                    ),
+                                    context,
+                                );
+                            }
                         }
                     }
                 },

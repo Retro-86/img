@@ -9,3 +9,4 @@ native-theme-gpui = "0.7.0"
 fatfs = "0.3"
 fscommon = "0.1"
 rfd = "0.17.2"
+serde = { version = "1.0", features = ["derive"] }

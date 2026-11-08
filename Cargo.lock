@@ -3200,6 +3200,7 @@ dependencies = [
  "gpui-kit",
  "native-theme-gpui",
  "rfd",
+ "serde",
 ]
 
 [[package]]
