@@ -20,7 +20,7 @@ impl RenderOnce for FileTree {
     fn render(self, _window: &mut Window, _context: &mut App) -> impl IntoElement {
         tree(&self.state, |index, entry, selected, _, _| {
             let item = entry.item();
-            let is_directory = item.id.ends_with('/');
+            let is_directory = item.is_folder();
 
             let icon = if !is_directory {
                 IconName::File
