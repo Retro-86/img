@@ -7,11 +7,12 @@ pub use crate::component::file_name_input::FileNameInput;
 pub use crate::component::file_tree::FileTree;
 pub use crate::component::path_picker::PathPicker;
 pub use crate::component::size_select::SizeSelect;
+use crate::dialog;
 use gpui_kit::base::TreeState;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::dialog::DialogFooter;
 use gpui_kit::component::menu::AppMenuBar;
-use gpui_kit::component::{ActiveTheme, Theme, TitleBar, WindowExt};
+use gpui_kit::component::{ActiveTheme, Theme, TitleBar};
 use gpui_kit::{
     App, AppContext, ClickEvent, Context, Div, ElementId, Entity, IntoElement, ParentElement,
     Styled, Window, div, px, transparent_black,
@@ -64,7 +65,7 @@ pub fn file_tree(state: Entity<TreeState>) -> FileTree {
     FileTree::new(state)
 }
 
-pub fn dialog_footer<T: 'static>(
+pub fn dialog_footer<T: dialog::Dialog>(
     context: &mut Context<T>,
     submit: impl Fn(&mut T, &ClickEvent, &mut Window, &mut Context<T>) + 'static,
 ) -> DialogFooter {
@@ -78,9 +79,9 @@ pub fn dialog_footer<T: 'static>(
         .child(
             Button::new("cancel")
                 .label("Cancel")
-                .on_click(|_, window, context| {
-                    window.close_dialog(context);
-                }),
+                .on_click(context.listener(|dialog, _, window, context| {
+                    dialog.cancel(window, context);
+                })),
         )
 }
 

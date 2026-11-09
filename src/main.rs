@@ -6,10 +6,8 @@ pub mod event;
 pub mod file_system;
 pub mod image;
 
-use crate::dialog::image::ImageDialog;
 use crate::image::Image;
-use gpui_kit::base::h_flex;
-use gpui_kit::component::menu::{AppMenuBar, ContextMenuExt};
+use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::{ActiveTheme, TitleBar};
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::{
@@ -77,25 +75,36 @@ impl Render for Application {
             })
             .on_action(
                 context.listener(|_, _: &actions::CreateImage, window, context| {
-                    dialog::CreateImageDialog::open(window, context);
+                    dialog::show_dialog(
+                        window,
+                        context,
+                        dialog::CreateImageDialog::new,
+                        image::handle_dialog_result,
+                    );
                 }),
             )
             .on_action(
                 context.listener(|_, _: &actions::OpenImage, window, context| {
-                    dialog::OpenImageDialog::open(window, context);
+                    dialog::show_dialog(
+                        window,
+                        context,
+                        dialog::OpenImageDialog::new,
+                        image::handle_dialog_result,
+                    );
                 }),
             )
             .on_action(
                 context.listener(|this, _: &actions::CloseImage, window, context| {
                     this.image = None;
-
-                    window.focus(&this.focus_handle, context);
                     context.notify();
+
+                    let focus_handle = this.focus_handle.clone();
+
+                    window.defer(context, move |window, context| {
+                        window.focus(&focus_handle, context);
+                    });
                 }),
             )
-            .on_action(context.listener(|_, _: &actions::Quit, _, context| {
-                context.quit();
-            }))
     }
 }
 
@@ -104,6 +113,10 @@ fn main() {
 
     application.run(|context| {
         gpui_kit::init(context);
+
+        context.on_action(|_: &actions::Quit, context| {
+            context.quit();
+        });
 
         let preference = AccessibilityPreferences::from_system();
         if let Ok((theme, resolved)) = from_preset("one-dark", true, &preference) {

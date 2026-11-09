@@ -2,9 +2,13 @@ use crate::file_system::read_directory;
 use fatfs::FileSystem;
 use fscommon::BufStream;
 use gpui_kit::base::TreeState;
-use gpui_kit::{AppContext, Context, Entity};
+use gpui_kit::{AppContext, Context, Entity, Window};
 use std::fs::File;
 use std::io;
+use gpui_kit::component::notification::NotificationType;
+use gpui_kit::component::WindowExt;
+use crate::Application;
+use crate::dialog::DialogResult;
 
 pub struct Image {
     file_system: FileSystem<BufStream<File>>,
@@ -44,4 +48,34 @@ pub fn create_tree_state<T>(
     });
 
     Ok(file_tree_state)
+}
+
+pub fn handle_dialog_result(
+    application: &mut Application,
+    result: DialogResult<FileSystem<BufStream<File>>>,
+    window: &mut Window,
+    context: &mut Context<Application>,
+) {
+    let DialogResult::Submitted(file_system) = result else {
+        return;
+    };
+
+    match create_tree_state(context, &file_system) {
+        Ok(state) => {
+            let image = context.new(|_| {
+                Image::from(file_system, state)
+            });
+
+            application.set_image(context, image);
+        }
+        Err(error) => {
+            window.push_notification(
+                (
+                    NotificationType::Error,
+                    format!("Unable to read the image contents\n{error}"),
+                ),
+                context,
+            );
+        }
+    }
 }

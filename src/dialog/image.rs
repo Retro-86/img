@@ -1,118 +1,56 @@
-use crate::dialog::dialog_form;
-use crate::image::Image;
-use crate::{Application, component, event, file_system, image};
+use crate::dialog::{Dialog, DialogEvent, dialog_form};
+use crate::{component, file_system};
+use std::fs::File;
+
 use fatfs::FileSystem;
 use fscommon::BufStream;
-use gpui_kit::component::WindowExt;
-use gpui_kit::component::dialog::DialogEntrance;
-use gpui_kit::component::notification::NotificationType;
-use gpui_kit::{
-    AppContext, ClickEvent, Context, Entity, EventEmitter, IntoElement, ParentElement, Render,
-    Window,
-};
-use std::cell::RefCell;
-use std::fs::File;
+use gpui_kit::{Context, Entity, EventEmitter, IntoElement, Render, SharedString, Window};
+use std::io;
 use std::path::PathBuf;
 use std::range::RangeInclusive;
-
-pub trait ImageDialog: Render + EventEmitter<event::ImageOpenEvent> + Sized + 'static {
-    const TITLE: &'static str;
-
-    fn new(window: &mut Window, context: &mut Context<Self>) -> Self;
-
-    fn open(window: &mut Window, context: &mut Context<Application>) {
-        let view = context.new(|context| Self::new(window, context));
-
-        context
-            .subscribe_in(
-                &view,
-                window,
-                |application, _view, event: &event::ImageOpenEvent, window, context| {
-                    if let Some(file_system) = event.0.borrow_mut().take() {
-                        match image::create_tree_state(context, &file_system) {
-                            Ok(state) => {
-                                let image = context.new(|_| Image::from(file_system, state));
-                                application.set_image(context, image);
-                            }
-                            Err(error) => {
-                                window.push_notification(
-                                    (
-                                        NotificationType::Error,
-                                        format!("Unable to read the image contents\n{error}"),
-                                    ),
-                                    context,
-                                );
-                            }
-                        }
-                    }
-                },
-            )
-            .detach();
-
-        window.open_dialog(context, move |dialog, _, _| {
-            dialog
-                .title(Self::TITLE)
-                .child(view.clone())
-                .entrance(DialogEntrance::Fade)
-        });
-    }
-
-    fn handle_result(
-        result: Result<FileSystem<BufStream<File>>, impl std::fmt::Display>,
-        error_prefix: &str,
-        window: &mut Window,
-        context: &mut Context<Self>,
-    ) {
-        match result {
-            Ok(file_system) => context.emit(event::ImageOpenEvent(RefCell::new(Some(file_system)))),
-            Err(error) => {
-                window.push_notification(
-                    (NotificationType::Error, format!("{error_prefix}\n{error}")),
-                    context,
-                );
-            }
-        }
-        window.close_dialog(context);
-    }
-}
 
 pub struct OpenImageDialog {
     file_picker: Entity<component::PathPicker>,
 }
 
-impl ImageDialog for OpenImageDialog {
-    const TITLE: &'static str = "Open image";
-
-    fn new(window: &mut Window, context: &mut Context<Self>) -> Self {
+impl OpenImageDialog {
+    pub fn new(window: &mut Window, context: &mut Context<Self>) -> Self {
         Self {
             file_picker: component::file_picker(window, context, "Image path"),
         }
     }
 }
 
-impl OpenImageDialog {
-    fn submit(&mut self, _event: &ClickEvent, window: &mut Window, context: &mut Context<Self>) {
-        let image_file_path_string = self.file_picker.read(context).value(context);
-        let image_file_path = PathBuf::from(image_file_path_string);
+impl Dialog for OpenImageDialog {
+    type Output = FileSystem<BufStream<File>>;
+    type Error = io::Error;
 
-        let file_system = file_system::open_image(&image_file_path);
+    fn title(&self) -> SharedString {
+        "Open image".into()
+    }
 
-        Self::handle_result(
-            file_system,
-            "Failed to open image file. Please try again.",
-            window,
-            context,
-        );
+    fn error_message(&self) -> SharedString {
+        "Failed to open image file. Please try again.".into()
+    }
+
+    fn submit(
+        &mut self,
+        _window: &mut Window,
+        context: &mut Context<Self>,
+    ) -> Result<Self::Output, Self::Error> {
+        let path = PathBuf::from(self.file_picker.read(context).value(context));
+
+        file_system::open_image(&path)
     }
 }
 
 impl Render for OpenImageDialog {
     fn render(&mut self, _window: &mut Window, context: &mut Context<Self>) -> impl IntoElement {
-        dialog_form(context, [self.file_picker.clone()], Self::submit)
+        dialog_form(context, [self.file_picker.clone()], Self::confirm)
     }
 }
 
-impl EventEmitter<event::ImageOpenEvent> for OpenImageDialog {}
+impl EventEmitter<DialogEvent<FileSystem<BufStream<File>>>> for OpenImageDialog {}
 
 pub struct CreateImageDialog {
     file_name_input: Entity<component::FileNameInput>,
@@ -120,10 +58,8 @@ pub struct CreateImageDialog {
     folder_picker: Entity<component::PathPicker>,
 }
 
-impl ImageDialog for CreateImageDialog {
-    const TITLE: &'static str = "Create image";
-
-    fn new(window: &mut Window, context: &mut Context<Self>) -> Self {
+impl CreateImageDialog {
+    pub fn new(window: &mut Window, context: &mut Context<Self>) -> Self {
         Self {
             file_name_input: component::file_name_input(window, context, "Name", ".img", "example"),
             size_select: component::size_select(context, RangeInclusive::from(2..=1024), 2),
@@ -132,23 +68,31 @@ impl ImageDialog for CreateImageDialog {
     }
 }
 
-impl CreateImageDialog {
-    fn submit(&mut self, _event: &ClickEvent, window: &mut Window, context: &mut Context<Self>) {
-        let image_name = self.file_name_input.read(context).value(context) + ".img";
-        let image_folder = self.folder_picker.read(context).value(context);
+impl Dialog for CreateImageDialog {
+    type Output = FileSystem<BufStream<File>>;
+    type Error = io::Error;
 
-        let image_path = PathBuf::from(image_folder).join(image_name);
+    fn title(&self) -> SharedString {
+        "Create image".into()
+    }
 
-        let image_size = self.size_select.read(context).value() as u64 * 1_048_576;
+    fn error_message(&self) -> SharedString {
+        "Failed to create image file. Please try again.".into()
+    }
 
-        let file_system = file_system::create_image(&image_path, image_size, *b"EMULATED_FS");
+    fn submit(
+        &mut self,
+        _window: &mut Window,
+        context: &mut Context<Self>,
+    ) -> Result<Self::Output, Self::Error> {
+        let name = self.file_name_input.read(context).value(context) + ".img";
 
-        Self::handle_result(
-            file_system,
-            "Failed to create image file. Please try again.",
-            window,
-            context,
-        );
+        let folder = self.folder_picker.read(context).value(context);
+        let path = PathBuf::from(folder).join(name);
+
+        let size = self.size_select.read(context).value() as u64 * 1_048_576;
+
+        file_system::create_image(&path, size, *b"EMULATED_FS")
     }
 }
 
@@ -161,9 +105,9 @@ impl Render for CreateImageDialog {
                 self.size_select.clone().into_any_element(),
                 self.folder_picker.clone().into_any_element(),
             ],
-            Self::submit,
+            Self::confirm,
         )
     }
 }
 
-impl EventEmitter<event::ImageOpenEvent> for CreateImageDialog {}
+impl EventEmitter<DialogEvent<FileSystem<BufStream<File>>>> for CreateImageDialog {}
