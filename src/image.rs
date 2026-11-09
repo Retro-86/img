@@ -33,6 +33,10 @@ impl Image {
     pub fn file_system(&self) -> &FileSystem<BufStream<File>> {
         &self.file_system
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.file_system.root_dir().iter().next().is_none()
+    }
 }
 
 pub fn create_tree_state<T>(

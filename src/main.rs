@@ -7,13 +7,14 @@ pub mod file_system;
 pub mod image;
 
 use crate::image::Image;
+use gpui_kit::component::label::Label;
 use gpui_kit::component::menu::AppMenuBar;
-use gpui_kit::component::{ActiveTheme, TitleBar};
+use gpui_kit::component::{ActiveTheme, TitleBar, v_flex};
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::{
     AppContext, Bounds, Context, Entity, FocusHandle, Focusable, Global, InteractiveElement,
     IntoElement, ParentElement, Render, Styled, Window, WindowBounds, WindowOptions, actions,
-    application, div, point, px, size, text,
+    application, point, px, size,
 };
 use native_theme_gpui::{AccessibilityPreferences, apply, from_preset};
 
@@ -56,21 +57,35 @@ impl Render for Application {
             .track_focus(&self.focus_handle)
             .child(component::title_bar(context, &self.menu_bar))
             .when_some(self.image.as_ref(), |this, image| {
-                this.child(component::file_tree(
-                    image.read(context).tree_state().clone(),
-                ))
-                .on_action(context.listener(|this, action: &actions::Rename, window, context| {}))
-                .on_action(context.listener(|this, action: &actions::Delete, window, context| {}))
+                let image = image.read(context);
+
+                if image.is_empty() {
+                    this.child(
+                        v_flex()
+                            .h_full()
+                            .w_full()
+                            .items_center()
+                            .justify_center()
+                            .child(Label::new("this image is empty").text_center()),
+                    )
+                } else {
+                    this.child(component::file_tree(image.tree_state().clone()))
+                        .on_action(
+                            context.listener(|this, action: &actions::Rename, window, context| {}),
+                        )
+                        .on_action(
+                            context.listener(|this, action: &actions::Delete, window, context| {}),
+                        )
+                }
             })
             .when_none(&self.image, |this| {
                 this.child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_center()
+                    v_flex()
                         .h_full()
                         .w_full()
-                        .child(text!("open or create image file")),
+                        .items_center()
+                        .justify_center()
+                        .child(Label::new("open or create image file").text_center()),
                 )
             })
             .on_action(
