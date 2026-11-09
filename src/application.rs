@@ -34,6 +34,10 @@ impl Application {
         context.notify();
     }
 
+    pub fn image(&self) -> Option<&Entity<Image>> {
+        self.image.as_ref()
+    }
+
     pub fn close_image(&mut self, window: &mut Window, context: &mut Context<Self>) {
         self.image = None;
         context.notify();
@@ -75,9 +79,7 @@ impl Render for Application {
                     )
                 } else {
                     this.child(component::file_tree(image.tree_state().clone()))
-                        .on_action(
-                            context.listener(|this, action: &actions::Rename, window, context| {}),
-                        )
+                        .on_action(context.listener(actions::rename_file))
                         .on_action(
                             context.listener(|this, action: &actions::Delete, window, context| {}),
                         )

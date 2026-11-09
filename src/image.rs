@@ -33,6 +33,37 @@ impl Image {
     pub fn is_empty(&self, context: &gpui_kit::App) -> bool {
         self.file_tree_state.read(context).entry(0).is_none()
     }
+
+    pub fn rename(
+        &mut self,
+        path: &str,
+        new_name: &str,
+        context: &mut Context<Self>,
+    ) -> io::Result<()> {
+        let rename_result = crate::file_system::rename_entry(&self.file_system, path, new_name);
+
+        let refresh_result = self.refresh_tree(context);
+
+        rename_result?;
+
+        refresh_result.map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("The entry was renamed, but the file tree could not be refreshed: {error}"),
+            )
+        })
+    }
+
+    fn refresh_tree(&mut self, context: &mut Context<Self>) -> io::Result<()> {
+        let items = read_directory_and_build_file_tree(&self.file_system.root_dir(), "")?;
+
+        self.file_tree_state.update(context, |state, context| {
+            state.set_items(items, context);
+        });
+
+        context.notify();
+        Ok(())
+    }
 }
 
 pub fn create_tree_state<T>(

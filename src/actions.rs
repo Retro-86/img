@@ -84,3 +84,46 @@ pub fn close_image(
 ) {
     application.close_image(window, context);
 }
+
+pub fn rename_file(
+    application: &mut Application,
+    action: &Rename,
+    window: &mut Window,
+    context: &mut Context<Application>,
+) {
+    let Some(image) = application.image().cloned() else {
+        return;
+    };
+
+    let path = action.identifier.to_string();
+    let current_name = path.rsplit('/').next().unwrap_or(&path).to_owned();
+
+    dialog::show_dialog(
+        window,
+        context,
+        move |window, context| {
+            dialog::file_system::RenameFileDialog::new(&current_name, window, context)
+        },
+        move |_, result, window, context| {
+            let DialogResult::Submitted(name) = result else {
+                return;
+            };
+
+            let result = image.update(context, |image, context| {
+                image.rename(&path, &name, context)
+            });
+
+            context.notify();
+
+            if let Err(error) = result {
+                window.push_notification(
+                    (
+                        NotificationType::Error,
+                        format!("Unable to rename file\n{error}"),
+                    ),
+                    context,
+                );
+            }
+        },
+    );
+}

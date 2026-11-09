@@ -102,3 +102,79 @@ pub fn copy_file_to_image(
 
     Ok(())
 }
+
+pub fn rename_entry<T: ReadWriteSeek>(
+    file_system: &FileSystem<T>,
+    path: &str,
+    new_name: &str,
+) -> io::Result<()> {
+    validate_entry_name(new_name)?;
+
+    let (parent, current_name) = path.rsplit_once('/').unwrap_or(("", path));
+
+    if current_name.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "The source path does not identify an entry.",
+        ));
+    }
+
+    if new_name == current_name {
+        return Ok(());
+    }
+
+    if new_name.to_uppercase() == current_name.to_uppercase() {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "Changing only letter case is not supported.",
+        ));
+    }
+
+    let destination = if parent.is_empty() {
+        new_name.to_owned()
+    } else {
+        format!("{parent}/{new_name}")
+    };
+
+    let root = file_system.root_dir();
+    root.rename(path, &root, &destination)
+}
+
+fn validate_entry_name(name: &str) -> io::Result<()> {
+    if name.trim().is_empty() || name == "." || name == ".." {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "File name is empty.",
+        ));
+    }
+
+    if name.len() > 255 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "File name exceeds 255 symbols.",
+        ));
+    }
+
+    let valid = name.chars().all(|character| {
+        matches!(
+            character,
+            'a'..='z'
+                | 'A'..='Z'
+                | '0'..='9'
+                | '\u{80}'..='\u{FFFF}'
+                | '$' | '%' | '\'' | '-' | '_' | '@'
+                | '~' | '`' | '!' | '(' | ')' | '{' | '}'
+                | '.' | ' ' | '+' | ',' | ';' | '='
+                | '[' | ']' | '^' | '#' | '&'
+        )
+    });
+
+    if !valid {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "File name contains unsupported characters.",
+        ));
+    }
+
+    Ok(())
+}
