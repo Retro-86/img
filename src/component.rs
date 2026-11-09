@@ -64,7 +64,7 @@ pub fn file_tree(state: Entity<TreeState>) -> FileTree {
     FileTree::new(state)
 }
 
-pub fn dialog_footer<T: 'static>(
+pub fn dialog_footer<T: crate::dialog::Dialog>(
     context: &mut Context<T>,
     submit: impl Fn(&mut T, &ClickEvent, &mut Window, &mut Context<T>) + 'static,
 ) -> DialogFooter {
@@ -78,9 +78,9 @@ pub fn dialog_footer<T: 'static>(
         .child(
             Button::new("cancel")
                 .label("Cancel")
-                .on_click(|_, window, context| {
-                    window.close_dialog(context);
-                }),
+                .on_click(context.listener(|instance, _, window, context| {
+                    instance.cancel(window, context);
+                })),
         )
 }
 
