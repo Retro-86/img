@@ -5,7 +5,7 @@ use std::fs::File;
 use std::path::Path;
 use std::{fs, io};
 
-pub fn read_directory<T: ReadWriteSeek>(
+pub fn read_directory_and_build_file_tree<T: ReadWriteSeek>(
     directory: &Dir<T>,
     current_path: &str,
 ) -> io::Result<Vec<TreeItem>> {
@@ -40,7 +40,7 @@ pub fn read_directory<T: ReadWriteSeek>(
         let mut tree_item = TreeItem::new(full_path.clone(), name);
 
         if entry.is_dir() {
-            let children = read_directory(&entry.to_dir(), &full_path)?;
+            let children = read_directory_and_build_file_tree(&entry.to_dir(), &full_path)?;
             tree_item = tree_item.children(children);
         }
 

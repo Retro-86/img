@@ -1,14 +1,10 @@
-use crate::file_system::read_directory;
+use crate::file_system::read_directory_and_build_file_tree;
 use fatfs::FileSystem;
 use fscommon::BufStream;
 use gpui_kit::base::TreeState;
-use gpui_kit::{AppContext, Context, Entity, Window};
+use gpui_kit::{AppContext, Context, Entity};
 use std::fs::File;
 use std::io;
-use gpui_kit::component::notification::NotificationType;
-use gpui_kit::component::WindowExt;
-use crate::Application;
-use crate::dialog::DialogResult;
 
 pub struct Image {
     file_system: FileSystem<BufStream<File>>,
@@ -34,8 +30,8 @@ impl Image {
         &self.file_system
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.file_system.root_dir().iter().next().is_none()
+    pub fn is_empty(&self, context: &gpui_kit::App) -> bool {
+        self.file_tree_state.read(context).entry(0).is_none()
     }
 }
 
@@ -43,7 +39,7 @@ pub fn create_tree_state<T>(
     context: &mut Context<T>,
     file_system: &FileSystem<BufStream<File>>,
 ) -> io::Result<Entity<TreeState>> {
-    let items = read_directory(&file_system.root_dir(), "")?;
+    let items = read_directory_and_build_file_tree(&file_system.root_dir(), "")?;
 
     let file_tree_state = context.new(|context| {
         let mut state = TreeState::new(context);
@@ -52,34 +48,4 @@ pub fn create_tree_state<T>(
     });
 
     Ok(file_tree_state)
-}
-
-pub fn handle_dialog_result(
-    application: &mut Application,
-    result: DialogResult<FileSystem<BufStream<File>>>,
-    window: &mut Window,
-    context: &mut Context<Application>,
-) {
-    let DialogResult::Submitted(file_system) = result else {
-        return;
-    };
-
-    match create_tree_state(context, &file_system) {
-        Ok(state) => {
-            let image = context.new(|_| {
-                Image::from(file_system, state)
-            });
-
-            application.set_image(context, image);
-        }
-        Err(error) => {
-            window.push_notification(
-                (
-                    NotificationType::Error,
-                    format!("Unable to read the image contents\n{error}"),
-                ),
-                context,
-            );
-        }
-    }
 }

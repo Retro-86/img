@@ -1,6 +1,15 @@
+use crate::application::Application;
+use crate::dialog;
+use crate::dialog::{CreateImageDialog, DialogResult, OpenImageDialog};
+use crate::image::{Image, create_tree_state};
+use fatfs::FileSystem;
+use fscommon::BufStream;
+use gpui_kit::component::WindowExt;
+use gpui_kit::component::notification::NotificationType;
 use gpui_kit::private::schemars;
-use gpui_kit::{Action, SharedString, actions};
+use gpui_kit::{Action, App, AppContext, Context, SharedString, Window, actions};
 use serde::Deserialize;
+use std::fs::File;
 
 actions!(application, [Quit, CreateImage, OpenImage, CloseImage]);
 actions!(image, [AddFile, CreateFile]);
@@ -15,4 +24,63 @@ pub struct Rename {
 #[action(namespace = file_tree)]
 pub struct Delete {
     pub identifier: SharedString,
+}
+
+pub fn quit(_: &Quit, context: &mut App) {
+    context.quit();
+}
+
+pub fn open_image(
+    _application: &mut Application,
+    _: &OpenImage,
+    window: &mut Window,
+    context: &mut Context<Application>,
+) {
+    dialog::show_dialog(window, context, OpenImageDialog::new, install_image);
+}
+
+pub fn create_image(
+    _application: &mut Application,
+    _: &CreateImage,
+    window: &mut Window,
+    context: &mut Context<Application>,
+) {
+    dialog::show_dialog(window, context, CreateImageDialog::new, install_image);
+}
+
+pub fn install_image(
+    application: &mut Application,
+    result: DialogResult<FileSystem<BufStream<File>>>,
+    window: &mut Window,
+    context: &mut Context<Application>,
+) {
+    let DialogResult::Submitted(file_system) = result else {
+        return;
+    };
+
+    match create_tree_state(context, &file_system) {
+        Ok(state) => {
+            let image = context.new(|_| Image::from(file_system, state));
+
+            application.set_image(context, image);
+        }
+        Err(error) => {
+            window.push_notification(
+                (
+                    NotificationType::Error,
+                    format!("Unable to read the image contents\n{error}"),
+                ),
+                context,
+            );
+        }
+    }
+}
+
+pub fn close_image(
+    application: &mut Application,
+    _: &CloseImage,
+    window: &mut Window,
+    context: &mut Context<Application>,
+) {
+    application.close_image(window, context);
 }
