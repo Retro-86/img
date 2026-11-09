@@ -85,7 +85,7 @@ pub fn close_image(
     application.close_image(window, context);
 }
 
-pub fn rename_file(
+pub fn rename_entry(
     application: &mut Application,
     action: &Rename,
     window: &mut Window,
@@ -102,7 +102,7 @@ pub fn rename_file(
         window,
         context,
         move |window, context| {
-            dialog::file_system::RenameFileDialog::new(&current_name, window, context)
+            dialog::file_system::RenameEntryDialog::new(&current_name, window, context)
         },
         move |_, result, window, context| {
             let DialogResult::Submitted(name) = result else {
@@ -119,7 +119,46 @@ pub fn rename_file(
                 window.push_notification(
                     (
                         NotificationType::Error,
-                        format!("Unable to rename file\n{error}"),
+                        format!("Unable to rename\n{error}"),
+                    ),
+                    context,
+                );
+            }
+        },
+    );
+}
+
+pub fn delete_entry(
+    application: &mut Application,
+    action: &Delete,
+    window: &mut Window,
+    context: &mut Context<Application>,
+) {
+    let Some(image) = application.image().cloned() else {
+        return;
+    };
+
+    let path = action.identifier.to_string();
+    let name = path.rsplit('/').next().unwrap_or(&path).to_owned();
+
+    dialog::show_dialog(
+        window,
+        context,
+        move |_, _| dialog::file_system::DeleteEntryDialog::new(name),
+        move |_, result, window, context| {
+            let DialogResult::Submitted(()) = result else {
+                return;
+            };
+
+            let result = image.update(context, |image, context| image.delete_entry(&path, context));
+
+            context.notify();
+
+            if let Err(error) = result {
+                window.push_notification(
+                    (
+                        NotificationType::Error,
+                        format!("Unable to delete\n{error}"),
                     ),
                     context,
                 );

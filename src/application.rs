@@ -79,10 +79,8 @@ impl Render for Application {
                     )
                 } else {
                     this.child(component::file_tree(image.tree_state().clone()))
-                        .on_action(context.listener(actions::rename_file))
-                        .on_action(
-                            context.listener(|this, action: &actions::Delete, window, context| {}),
-                        )
+                        .on_action(context.listener(actions::rename_entry))
+                        .on_action(context.listener(actions::delete_entry))
                 }
             })
             .when_none(&self.image, |this| {

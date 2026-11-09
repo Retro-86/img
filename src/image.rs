@@ -54,6 +54,28 @@ impl Image {
         })
     }
 
+    pub fn delete_entry(
+        &mut self,
+        path: &str,
+        context: &mut Context<Self>,
+    ) -> io::Result<()> {
+        let delete_result =
+            crate::file_system::delete_entry(&self.file_system, path);
+
+        let refresh_result = self.refresh_tree(context);
+
+        delete_result?;
+
+        refresh_result.map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!(
+                    "The entry was deleted, but the file tree could not be refreshed: {error}"
+                ),
+            )
+        })
+    }
+
     fn refresh_tree(&mut self, context: &mut Context<Self>) -> io::Result<()> {
         let items = read_directory_and_build_file_tree(&self.file_system.root_dir(), "")?;
 

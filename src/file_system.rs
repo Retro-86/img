@@ -178,3 +178,70 @@ fn validate_entry_name(name: &str) -> io::Result<()> {
 
     Ok(())
 }
+
+pub fn delete_entry<T: ReadWriteSeek>(file_system: &FileSystem<T>, path: &str) -> io::Result<()> {
+    if path
+        .split('/')
+        .any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Invalid entry path.",
+        ));
+    }
+
+    let root = file_system.root_dir();
+    let (parent_path, name) = path.rsplit_once('/').unwrap_or(("", path));
+
+    let parent = if parent_path.is_empty() {
+        root
+    } else {
+        root.open_dir(parent_path)?
+    };
+
+    for entry in parent.iter() {
+        let entry = entry?;
+
+        if entry.file_name() != name {
+            continue;
+        }
+
+        if entry.is_dir() {
+            let directory = entry.to_dir();
+            delete_directory_contents(&directory)?;
+        }
+
+        return parent.remove(name);
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!("Entry not found: {path}"),
+    ))
+}
+
+fn delete_directory_contents<T: ReadWriteSeek>(directory: &Dir<T>) -> io::Result<()> {
+    let mut children = Vec::new();
+
+    for entry in directory.iter() {
+        let entry = entry?;
+        let name = entry.file_name();
+
+        if name == "." || name == ".." {
+            continue;
+        }
+
+        children.push((name, entry.is_dir()));
+    }
+
+    for (name, is_directory) in children {
+        if is_directory {
+            let child = directory.open_dir(&name)?;
+            delete_directory_contents(&child)?;
+        }
+
+        directory.remove(&name)?;
+    }
+
+    Ok(())
+}
