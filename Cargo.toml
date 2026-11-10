@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-iced = "0.14"
-iced_aw = "0.14"
+gpui-kit = "0.8.1"
+native-theme-gpui = "0.7.0"
 fatfs = "0.3"
 fscommon = "0.1"
 rfd = "0.17.2"
+serde = { version = "1.0", features = ["derive"] }
