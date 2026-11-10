@@ -18,7 +18,7 @@ pub fn initialize(context: &mut App) {
             name: "Image".into(),
             items: vec![
                 MenuItem::action("Create file", actions::CreateFile),
-                MenuItem::action("Add file", actions::AddFile),
+                MenuItem::action("Transfer file", actions::TransferFile),
             ],
             disabled: false,
         },

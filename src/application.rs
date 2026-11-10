@@ -96,5 +96,7 @@ impl Render for Application {
             .on_action(context.listener(actions::open_image))
             .on_action(context.listener(actions::create_image))
             .on_action(context.listener(actions::close_image))
+            .on_action(context.listener(actions::create_file))
+            .on_action(context.listener(actions::transfer_file))
     }
 }

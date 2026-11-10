@@ -1,5 +1,5 @@
-use crate::component;
-use crate::dialog::{Dialog, DialogEvent, dialog_form};
+use crate::dialog::{Dialog, DialogEvent};
+use crate::{component, dialog};
 use std::convert::Infallible;
 
 use gpui_kit::component::label::Label;
@@ -7,6 +7,7 @@ use gpui_kit::{
     Context, Entity, EventEmitter, IntoElement, ParentElement, Render, SharedString, Window, div,
 };
 use std::io;
+use std::path::{Path, PathBuf};
 
 pub struct RenameEntryDialog {
     name_input: Entity<component::FileNameInput>,
@@ -45,7 +46,7 @@ impl Dialog for RenameEntryDialog {
 
 impl Render for RenameEntryDialog {
     fn render(&mut self, _window: &mut Window, context: &mut Context<Self>) -> impl IntoElement {
-        dialog_form(context, [self.name_input.clone()], Self::confirm)
+        dialog::dialog_form(context, [self.name_input.clone()], Self::confirm)
     }
 }
 
@@ -84,7 +85,7 @@ impl Dialog for DeleteEntryDialog {
 
 impl Render for DeleteEntryDialog {
     fn render(&mut self, _window: &mut Window, context: &mut Context<Self>) -> impl IntoElement {
-        dialog_form(
+        dialog::dialog_form(
             context,
             [div().children([
                 Label::new(format!("Delete \"{}\"?", self.name)),
@@ -96,3 +97,90 @@ impl Render for DeleteEntryDialog {
 }
 
 impl EventEmitter<DialogEvent<()>> for DeleteEntryDialog {}
+
+pub struct TransferFileDialog {
+    file_path_picker: Entity<component::PathPicker>,
+}
+
+impl TransferFileDialog {
+    pub fn new(window: &mut Window, context: &mut Context<Self>) -> Self {
+        let file_path_picker = component::file_picker(window, context, "File path");
+
+        Self { file_path_picker }
+    }
+}
+
+impl Dialog for TransferFileDialog {
+    type Output = PathBuf;
+    type Error = io::Error;
+
+    fn title(&self) -> SharedString {
+        "Transfer file".into()
+    }
+
+    fn error_message(&self) -> SharedString {
+        "Failed to transfer file. Please retry later".into()
+    }
+
+    fn submit(
+        &mut self,
+        _window: &mut Window,
+        context: &mut Context<Self>,
+    ) -> Result<Self::Output, Self::Error> {
+        let file_path = self.file_path_picker.read(context).value(context);
+
+        Ok(Path::new(&file_path).to_path_buf())
+    }
+}
+
+impl Render for TransferFileDialog {
+    fn render(&mut self, _window: &mut Window, context: &mut Context<Self>) -> impl IntoElement {
+        dialog::dialog_form(context, [self.file_path_picker.clone()], Self::confirm)
+    }
+}
+
+impl EventEmitter<DialogEvent<PathBuf>> for TransferFileDialog {}
+
+pub struct CreateFileDialog {
+    file_name_input: Entity<component::FileNameInput>,
+}
+
+impl CreateFileDialog {
+    pub fn new(window: &mut Window, context: &mut Context<Self>) -> Self {
+        let file_name_input =
+            component::file_name_input(window, context, "File name", "", "example.txt");
+
+        Self { file_name_input }
+    }
+}
+
+impl Dialog for CreateFileDialog {
+    type Output = String;
+    type Error = io::Error;
+
+    fn title(&self) -> SharedString {
+        "Create file".into()
+    }
+
+    fn error_message(&self) -> SharedString {
+        "Failed to transfer file. Please retry later".into()
+    }
+
+    fn submit(
+        &mut self,
+        _window: &mut Window,
+        context: &mut Context<Self>,
+    ) -> Result<Self::Output, Self::Error> {
+        let file_path = self.file_name_input.read(context).value(context);
+
+        Ok(file_path)
+    }
+}
+
+impl Render for CreateFileDialog {
+    fn render(&mut self, _window: &mut Window, context: &mut Context<Self>) -> impl IntoElement {
+        dialog::dialog_form(context, [self.file_name_input.clone()], Self::confirm)
+    }
+}
+
+impl EventEmitter<DialogEvent<String>> for CreateFileDialog {}

@@ -140,6 +140,26 @@ pub fn rename_entry<T: ReadWriteSeek>(
     root.rename(path, &root, &destination)
 }
 
+pub fn create_file(
+    file_system: &mut FileSystem<BufStream<File>>,
+    file_path: &str,
+) -> io::Result<()> {
+    validate_entry_name(&file_path)?;
+
+    let root_directory = file_system.root_dir();
+
+    let file_exists = root_directory.open_file(file_path).is_ok();
+    if file_exists {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "File already exists.",
+        ));
+    }
+
+    root_directory.create_file(file_path)?;
+    Ok(())
+}
+
 fn validate_entry_name(name: &str) -> io::Result<()> {
     if name.trim().is_empty() || name == "." || name == ".." {
         return Err(io::Error::new(

@@ -1,7 +1,8 @@
 use crate::application::Application;
-use crate::dialog;
+use crate::dialog::file_system::{CreateFileDialog, TransferFileDialog};
 use crate::dialog::{CreateImageDialog, DialogResult, OpenImageDialog};
-use crate::image::{Image, create_tree_state};
+use crate::image::Image;
+use crate::{dialog, image};
 use fatfs::FileSystem;
 use fscommon::BufStream;
 use gpui_kit::component::WindowExt;
@@ -12,7 +13,7 @@ use serde::Deserialize;
 use std::fs::File;
 
 actions!(application, [Quit, CreateImage, OpenImage, CloseImage]);
-actions!(image, [AddFile, CreateFile]);
+actions!(image, [TransferFile, CreateFile]);
 
 #[derive(Action, Clone, PartialEq, Deserialize, schemars::JsonSchema)]
 #[action(namespace = file_tree)]
@@ -58,7 +59,7 @@ pub fn install_image(
         return;
     };
 
-    match create_tree_state(context, &file_system) {
+    match image::create_tree_state(context, &file_system) {
         Ok(state) => {
             let image = context.new(|_| Image::from(file_system, state));
 
@@ -110,7 +111,7 @@ pub fn rename_entry(
             };
 
             let result = image.update(context, |image, context| {
-                image.rename(&path, &name, context)
+                image.rename_entry(context, &path, &name)
             });
 
             context.notify();
@@ -119,7 +120,7 @@ pub fn rename_entry(
                 window.push_notification(
                     (
                         NotificationType::Error,
-                        format!("Unable to rename\n{error}"),
+                        format!("Unable to rename_entry\n{error}"),
                     ),
                     context,
                 );
@@ -150,7 +151,7 @@ pub fn delete_entry(
                 return;
             };
 
-            let result = image.update(context, |image, context| image.delete_entry(&path, context));
+            let result = image.update(context, |image, context| image.delete_entry(context, &path));
 
             context.notify();
 
@@ -159,6 +160,82 @@ pub fn delete_entry(
                     (
                         NotificationType::Error,
                         format!("Unable to delete\n{error}"),
+                    ),
+                    context,
+                );
+            }
+        },
+    );
+}
+
+pub fn transfer_file(
+    application: &mut Application,
+    _action: &TransferFile,
+    window: &mut Window,
+    context: &mut Context<Application>,
+) {
+    let Some(image) = application.image().cloned() else {
+        return;
+    };
+
+    dialog::show_dialog(
+        window,
+        context,
+        TransferFileDialog::new,
+        move |_, result, window, context| {
+            let DialogResult::Submitted(file_path) = result else {
+                return;
+            };
+
+            let result = image.update(context, |image, context| {
+                image.transfer_file(context, &file_path)
+            });
+
+            context.notify();
+
+            if let Err(error) = result {
+                window.push_notification(
+                    (
+                        NotificationType::Error,
+                        format!("Unable to transfer file into image\n{error}"),
+                    ),
+                    context,
+                );
+            }
+        },
+    );
+}
+
+pub fn create_file(
+    application: &mut Application,
+    _action: &CreateFile,
+    window: &mut Window,
+    context: &mut Context<Application>,
+) {
+    let Some(image) = application.image().cloned() else {
+        return;
+    };
+
+    dialog::show_dialog(
+        window,
+        context,
+        CreateFileDialog::new,
+        move |_, result, window, context| {
+            let DialogResult::Submitted(file_path) = result else {
+                return;
+            };
+
+            let result = image.update(context, |image, context| {
+                image.create_file(context, &file_path)
+            });
+
+            context.notify();
+
+            if let Err(error) = result {
+                window.push_notification(
+                    (
+                        NotificationType::Error,
+                        format!("Unable to create file in image\n{error}"),
                     ),
                     context,
                 );
