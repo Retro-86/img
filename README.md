@@ -31,10 +31,10 @@ cargo run --release
 
 ## Usage
 
-1. Create an image via **File → Create image**, specifying a name, size, and folder, or open an existing one via **File → Open image** 
-2. Add a file from your computer via **Image → Transfer file** or create an empty file via **Image → Create file**. Files are added to the root of the image
+1. Create an image via **File -> Create image**, specifying a name, size, and folder, or open an existing one via **File -> Open image** 
+2. Add a file from your computer via **Image -> Transfer file** or create an empty file via **Image -> Create file**
 3. To rename or delete a file, right-click on it and select **Rename** or **Delete**
-4. When you’re finished, close the image via **File → Close image**
+4. When you’re finished, close the image via **File -> Close image**
 
 ## License
 
